@@ -255,6 +255,17 @@ describe('computeSignals', () => {
     expect(ids(s)).not.toContain('S1');
   });
 
+  it('S1 et S2 : rien tant que le stock n est pas suivi', () => {
+    const s = computeSignals({
+      asOf: AS_OF,
+      products: [product({ stockQty: null, restockLeadTimeDays: 12 })],
+      orders: [...orders(70, 2, 'confirmed'), ...orders(5, 30, 'delivered')],
+      adDays: [],
+    });
+    expect(ids(s)).not.toContain('S1');
+    expect(ids(s)).not.toContain('S2');
+  });
+
   it('S2 : stock dormant', () => {
     const s = computeSignals({
       asOf: AS_OF,

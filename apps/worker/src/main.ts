@@ -1,12 +1,29 @@
 import { QUEUES } from '@7sebeti/contracts';
 import { createDb, eq, schema } from '@7sebeti/db';
-import { parseKeyring, unwrapDataKey } from '@7sebeti/integrations';
+import { BRIEF_OUTPUT_SCHEMA, BRIEF_SYSTEM_PROMPT } from '@7sebeti/domain';
+import { createClaudeJsonWriter, parseKeyring, unwrapDataKey } from '@7sebeti/integrations';
 import { PgBoss } from 'pg-boss';
 import { z } from 'zod';
+import { type BriefDeps, collectDailyBriefs, fallbackDailyBriefs, prepareDailyBriefs } from './jobs/ai-brief';
+import { createBriefStore } from './jobs/ai-brief-store';
 import { ingestOrderEvent } from './jobs/ingest-order';
 
+// An empty line in .env counts as unset.
+const optional = z
+  .string()
+  .optional()
+  .transform((v) => v?.trim() || undefined);
+
 const env = z
-  .object({ DATABASE_URL: z.string().url(), DATA_MASTER_KEY: z.string().min(1) })
+  .object({
+    DATABASE_URL: z.string().url(),
+    DATA_MASTER_KEY: z.string().min(1),
+    /** Without it the nightly brief keeps the raw signals (no model call). */
+    ANTHROPIC_API_KEY: optional,
+    AI_BRIEF_ENABLED: z.enum(['true', 'false', '']).default('true'),
+    /** Defaults to the integration's model; switches model without a code change. */
+    AI_BRIEF_MODEL: optional,
+  })
   .parse(process.env);
 const { db, client } = createDb(env.DATABASE_URL, { max: 5 });
 const master = parseKeyring(env.DATA_MASTER_KEY);
@@ -37,6 +54,44 @@ await boss.work<{ eventId: string }>(QUEUES.inboundEvent, async (jobs) => {
     console.log(`[ingest] ${job.data.eventId} → ${result}`);
   }
 });
+
+// ─── Nightly AI brief ───────────────────────────────────────────────────────
+
+const briefDeps: BriefDeps = {
+  store: createBriefStore(db),
+  writer:
+    env.ANTHROPIC_API_KEY && env.AI_BRIEF_ENABLED !== 'false'
+      ? createClaudeJsonWriter({
+          apiKey: env.ANTHROPIC_API_KEY,
+          model: env.AI_BRIEF_MODEL,
+          system: BRIEF_SYSTEM_PROMPT,
+          schema: BRIEF_OUTPUT_SCHEMA,
+        })
+      : null,
+  now: () => new Date(),
+  log: (message) => console.error(message),
+};
+if (!briefDeps.writer) console.log('[brief] AI off: briefs keep the raw signals');
+
+const briefJobs = [
+  // Times in Tunis: signals after the evening's orders are in, brief ready before the merchant wakes up.
+  { queue: QUEUES.aiBriefPrepare, cron: '0 3 * * *', run: prepareDailyBriefs },
+  { queue: QUEUES.aiBriefCollect, cron: '*/10 * * * *', run: collectDailyBriefs },
+  { queue: QUEUES.aiBriefFallback, cron: '0 7 * * *', run: fallbackDailyBriefs },
+];
+for (const { queue, cron, run } of briefJobs) {
+  // exclusive: a slow run is never doubled by the next tick.
+  await boss.createQueue(queue, { policy: 'exclusive', retryLimit: 1, retryBackoff: true });
+  await boss.schedule(queue, cron, null, { tz: 'Africa/Tunis', missed: 'once' });
+  await boss.work(queue, async () => {
+    try {
+      console.log(`[brief] ${queue}`, JSON.stringify(await run(briefDeps)));
+    } catch (err) {
+      console.error(`[brief] ${queue} failed:`, err instanceof Error ? err.message : err);
+      throw err;
+    }
+  });
+}
 
 console.log('7sebeti worker started');
 

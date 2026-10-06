@@ -3,7 +3,7 @@ import { DEFAULT_SIGNAL_THRESHOLDS, type SignalThresholds } from './thresholds';
 
 /**
  * Signaux « Actions à prendre » : le code calcule, l'IA explique.
- * Fonctions pures, sans I/O ni appel à un modèle. Le job `ai.daily-brief` charge les
+ * Fonctions pures, sans I/O ni appel à un modèle. Le job de brief du worker charge les
  * données d'une organisation, appelle `computeSignals`, puis demande au modèle de
  * classer et formuler les signaux, sans jamais inventer un chiffre.
  *
@@ -22,7 +22,8 @@ export interface SignalProduct {
   deliveryCostMinor: number;
   /** Frais d'un colis retourné. */
   returnCostMinor: number;
-  stockQty: number;
+  /** null tant que le stock n'est pas suivi : S1 et S2 sont alors ignorés. */
+  stockQty: number | null;
   restockLeadTimeDays: number | null;
   targetConfirmRatePct: number | null;
 }
@@ -523,10 +524,12 @@ export function computeSignals(
     }
 
     for (const p of input.products) {
+      const stock = p.stockQty;
+      if (stock === null) continue;
       const sold = sold7.get(p.id);
-      if (p.stockQty <= 0 && !sold) continue;
+      if (stock <= 0 && !sold) continue;
       const perDay = sold / 7;
-      const daysOfStock = perDay ? p.stockQty / perDay : null;
+      const daysOfStock = perDay ? stock / perDay : null;
       const lead = p.restockLeadTimeDays;
 
       // S1 : rupture avant que le réappro n'arrive.
@@ -537,7 +540,7 @@ export function computeSignals(
           title: 'Rupture proche',
           subject: productSubject(p.id),
           figures: {
-            stock: p.stockQty,
+            stock,
             ventesParJour: round1(perDay),
             joursDeStock: round1(daysOfStock),
             delaiReapproJours: lead,
@@ -555,17 +558,17 @@ export function computeSignals(
         noSaleDays === null ||
         noSaleDays >= t.dormantNoSaleDays ||
         (daysOfStock !== null && daysOfStock > t.dormantMaxDaysOfStock);
-      if (p.stockQty > 0 && dormant) {
+      if (stock > 0 && dormant) {
         out.push({
           id: 'S2',
           domain: 'stock',
           title: 'Stock dormant',
           subject: productSubject(p.id),
           figures: {
-            stock: p.stockQty,
+            stock,
             joursSansVente: noSaleDays,
             joursDeStock: daysOfStock === null ? null : Math.round(daysOfStock),
-            valeurStockMinor: p.unitCostMinor === null ? null : p.stockQty * p.unitCostMinor,
+            valeurStockMinor: p.unitCostMinor === null ? null : stock * p.unitCostMinor,
           },
           threshold: `${t.dormantNoSaleDays} jours sans vente ou plus de ${t.dormantMaxDaysOfStock} jours de stock`,
           stakeMinor: 0,

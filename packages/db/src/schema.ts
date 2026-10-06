@@ -7,8 +7,10 @@ import { sql } from 'drizzle-orm';
 import {
   bigint,
   boolean,
+  date,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   primaryKey,
@@ -382,4 +384,53 @@ export const orderEvent = pgTable(
     occurredAt: timestamp({ withTimezone: true }).notNull(),
   },
   (t) => [uniqueIndex().on(t.orderId, t.occurredAt, t.sourceStatus)],
+);
+
+// ─── AI brief ───────────────────────────────────────────────────────────────
+
+/**
+ * empty: no signal that day, no model call. signals_only: AI off or no API key, the screen shows
+ * the raw signals. pending → submitted (in a Batch API job) → ready, or failed after the morning retry.
+ */
+export const aiBriefStatus = pgEnum('ai_brief_status', [
+  'empty',
+  'signals_only',
+  'pending',
+  'submitted',
+  'ready',
+  'failed',
+]);
+
+/** Daily « Actions à prendre » brief: signals computed by code, wording by Claude. One row per org and day. */
+export const aiBrief = pgTable(
+  'ai_brief',
+  {
+    id: id(),
+    organizationId: orgRef(),
+    /** Day of the brief in the organization's timezone. */
+    briefDate: date({ mode: 'string' }).notNull(),
+    status: aiBriefStatus().notNull(),
+    /** Full signals (real agent names, links): what the screen shows when the AI text is missing. */
+    signals: jsonb().notNull(),
+    /** What is sent to the model: whitelisted, pseudonymised, formatted. Null when nothing is sent. */
+    payload: jsonb(),
+    /** Pseudonym → real agent name, to restore names in the answer. Never sent to the model. */
+    pseudonyms: jsonb(),
+    /** Validated brief with real names restored (BriefContent in @7sebeti/domain). */
+    content: jsonb(),
+    model: text(),
+    batchId: text(),
+    attempts: integer().notNull().default(0),
+    /** Usage of the answer that was kept, for cost tracking (uncached input, output, cache reads and writes). */
+    inputTokens: integer(),
+    outputTokens: integer(),
+    cacheReadTokens: integer(),
+    cacheWriteTokens: integer(),
+    /** Non-blocking checks on the answer (figure not found in the data, unknown pseudonym…). */
+    warnings: text().array().notNull().default(sql`'{}'::text[]`),
+    error: text(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex().on(t.organizationId, t.briefDate), index().on(t.status, t.briefDate)],
 );

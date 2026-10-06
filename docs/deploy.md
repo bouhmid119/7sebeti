@@ -12,6 +12,8 @@
 
 `render.yaml` est un Blueprint : dans Render, *New → Blueprint*, choisir ce repo. Les migrations tournent en `preDeployCommand` avant chaque déploiement de l'API. Renseigner `ENCRYPTION_KEY` (`openssl rand -base64 32`) à la main, identique sur l'API et le worker.
 
+Brief IA de nuit : renseigner `ANTHROPIC_API_KEY` sur le worker seulement (sans elle, le brief garde les signaux bruts). `AI_BRIEF_MODEL` change de modèle sans toucher au code, `AI_BRIEF_ENABLED=false` coupe l'IA. Détails : `docs/brief-ia.md`.
+
 ## Cloudflare Pages
 
 - Projet relié à ce repo, branche de production `main`.
