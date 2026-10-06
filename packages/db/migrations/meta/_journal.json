@@ -8,6 +8,20 @@
       "when": 1791328563599,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791329182255,
+      "tag": "0001_auth_pii_dedup",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791329205587,
+      "tag": "0002_rls",
+      "breakpoints": true
     }
   ]
 }

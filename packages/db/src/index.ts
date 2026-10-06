@@ -1,7 +1,9 @@
+import { sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from './schema';
 
+export { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 export { schema };
 
 export function createDb(url: string, options: { max?: number } = {}) {
@@ -14,21 +16,36 @@ export type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 export type ExecuteSql = (text: string, values?: unknown[]) => Promise<{ rows: unknown[] }>;
 
 /**
- * Run `fn` in one Drizzle transaction and also expose a raw executor bound to that same
- * transaction, so pg-boss can enqueue a job atomically with the rows that justify it
- * (no "row stored but job lost" window).
+ * Raw SQL executor bound to a Drizzle transaction, for libraries that take their own SQL
+ * (pg-boss). Enqueuing through it commits the job atomically with the rows that justify it.
  */
-export function inTransaction<T>(
-  db: Db,
-  fn: (tx: { db: Tx; executeSql: ExecuteSql }) => Promise<T>,
-): Promise<T> {
+export function rawExecutor(tx: Tx): ExecuteSql {
+  // Drizzle's postgres-js session holds the transaction-scoped client.
+  const client = (tx as unknown as { session?: { client?: postgres.TransactionSql } }).session?.client;
+  if (!client?.unsafe) throw new Error('rawExecutor: postgres-js transaction client not found');
+  return async (text, values = []) => ({ rows: await client.unsafe(text, values as never[]) });
+}
+
+/** Tables deliberately outside row-level security (auth is per user, not per organization). */
+export const RLS_EXEMPT_TABLES = ['user', 'session', 'account', 'verification', 'two_factor'] as const;
+
+/**
+ * Run `fn` as the restricted `app_rw` role with `app.org_id` set for this transaction only.
+ * Every query inside only sees, and can only write, that organization's rows.
+ */
+export function withTenant<T>(db: Db, organizationId: string, fn: (tx: Tx) => Promise<T>): Promise<T> {
   return db.transaction(async (tx) => {
-    // Drizzle's postgres-js session holds the transaction-scoped client.
-    const client = (tx as unknown as { session?: { client?: postgres.TransactionSql } }).session?.client;
-    if (!client?.unsafe) throw new Error('inTransaction: postgres-js transaction client not found');
-    const executeSql: ExecuteSql = async (text, values = []) => ({
-      rows: await client.unsafe(text, values as never[]),
-    });
-    return fn({ db: tx, executeSql });
+    await tx.execute(sql`set local role app_rw`);
+    await tx.execute(sql`select set_config('app.org_id', ${organizationId}, true)`);
+    return fn(tx);
+  });
+}
+
+/** Like withTenant, before an organization is chosen: only the user's own memberships are visible. */
+export function withUser<T>(db: Db, userId: string, fn: (tx: Tx) => Promise<T>): Promise<T> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`set local role app_rw`);
+    await tx.execute(sql`select set_config('app.user_id', ${userId}, true)`);
+    return fn(tx);
   });
 }

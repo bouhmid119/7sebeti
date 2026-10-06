@@ -34,10 +34,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck
-      - run: pnpm test
-      - run: pnpm build
       - name: Migrations apply on a fresh database
         run: pnpm db:migrate
+      - name: Tests (unit + RLS + API against Postgres)
+        run: pnpm test
+      - run: pnpm build
       - name: Schema and migrations are in sync
         run: |
           pnpm db:generate

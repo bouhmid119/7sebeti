@@ -24,7 +24,13 @@ services:
         fromDatabase: { name: sebeti-db, property: connectionString }
       - key: APP_URL
         value: https://app.7sebeti.com
+      - key: API_URL
+        value: https://api.7sebeti.com
+      - key: BETTER_AUTH_SECRET
+        generateValue: true
       - key: ENCRYPTION_KEY
+        sync: false
+      - key: DATA_MASTER_KEY
         sync: false
 
   - type: worker
@@ -39,5 +45,5 @@ services:
         value: production
       - key: DATABASE_URL
         fromDatabase: { name: sebeti-db, property: connectionString }
-      - key: ENCRYPTION_KEY
+      - key: DATA_MASTER_KEY
         sync: false

@@ -15,7 +15,7 @@
     "@7sebeti/domain": "workspace:*",
     "@7sebeti/integrations": "workspace:*",
     "@hono/node-server": "^2.1.3",
-    "drizzle-orm": "^0.45.3",
+    "better-auth": "^1.7.7",
     "hono": "^4.13.13",
     "pg-boss": "^12.36.0",
     "zod": "^3.25.76"

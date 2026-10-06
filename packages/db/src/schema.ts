@@ -9,7 +9,6 @@ import {
   boolean,
   index,
   integer,
-  jsonb,
   pgEnum,
   pgTable,
   primaryKey,
@@ -45,18 +44,94 @@ export const organization = pgTable('organization', {
   timezone: text().notNull().default('Africa/Tunis'),
   /** Modules the merchant is subscribed to (dashboard, funnel, cashflow…). */
   enabledModules: text().array().notNull().default(sql`'{}'::text[]`),
+  /** Per-organization data key (AES-256), wrapped with DATA_MASTER_KEY. Deleting it crypto-shreds the org. */
+  dataKeyEncrypted: text().notNull(),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
 
+// Auth tables follow the Better Auth model (user, session, account, verification, two_factor).
+// They are not organization-scoped and stay outside row-level security.
+
 export const user = pgTable('user', {
   id: id(),
   email: text().notNull().unique(),
-  name: text(),
+  name: text().notNull().default(''),
+  emailVerified: boolean().notNull().default(false),
+  image: text(),
+  twoFactorEnabled: boolean().notNull().default(false),
   isPlatformAdmin: boolean().notNull().default(false),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
+
+const userRef = () =>
+  uuid()
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' });
+
+export const session = pgTable(
+  'session',
+  {
+    id: id(),
+    userId: userRef(),
+    token: text().notNull().unique(),
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
+    ipAddress: text(),
+    userAgent: text(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index().on(t.userId)],
+);
+
+export const account = pgTable(
+  'account',
+  {
+    id: id(),
+    userId: userRef(),
+    accountId: text().notNull(),
+    providerId: text().notNull(),
+    accessToken: text(),
+    refreshToken: text(),
+    idToken: text(),
+    accessTokenExpiresAt: timestamp({ withTimezone: true }),
+    refreshTokenExpiresAt: timestamp({ withTimezone: true }),
+    scope: text(),
+    /** Password hash for the email/password provider. */
+    password: text(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index().on(t.userId)],
+);
+
+export const verification = pgTable(
+  'verification',
+  {
+    id: id(),
+    identifier: text().notNull(),
+    value: text().notNull(),
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index().on(t.identifier)],
+);
+
+export const twoFactor = pgTable(
+  'two_factor',
+  {
+    id: id(),
+    userId: userRef(),
+    secret: text().notNull(),
+    backupCodes: text().notNull(),
+    verified: boolean().notNull().default(true),
+    failedVerificationCount: integer().notNull().default(0),
+    lockedUntil: timestamp({ withTimezone: true }),
+  },
+  (t) => [index().on(t.userId), index().on(t.secret)],
+);
 
 export const membership = pgTable(
   'membership',
@@ -120,14 +195,40 @@ export const inboundEvent = pgTable(
     provider: integrationProvider().notNull(),
     eventType: text().notNull(),
     externalId: text(),
-    payload: jsonb().notNull(),
+    /** SHA-256 of the canonical JSON payload. */
+    payloadHash: text().notNull(),
+    /** Payload gzip-compressed then encrypted with the organization data key. */
+    payloadEncrypted: text().notNull(),
     status: inboundEventStatus().notNull().default('received'),
     attempts: integer().notNull().default(0),
     error: text(),
     receivedAt: createdAt(),
     processedAt: timestamp({ withTimezone: true }),
   },
-  (t) => [index().on(t.organizationId, t.receivedAt), index().on(t.status)],
+  (t) => [
+    index().on(t.organizationId, t.receivedAt),
+    index('inbound_event_pending_idx').on(t.receivedAt).where(sql`status <> 'processed'`),
+  ],
+);
+
+/**
+ * Last known fingerprint of each external object (order, shipment…). A webhook whose
+ * canonical payload hash matches costs no write, no job and no recompute; only the
+ * counter moves. Kept 13 months as the idempotency trail.
+ */
+export const externalObjectState = pgTable(
+  'external_object_state',
+  {
+    organizationId: orgRef(),
+    provider: integrationProvider().notNull(),
+    objectType: text().notNull(),
+    externalId: text().notNull(),
+    payloadHash: text().notNull(),
+    duplicateCount: integer().notNull().default(0),
+    firstSeenAt: createdAt(),
+    lastSeenAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.organizationId, t.provider, t.objectType, t.externalId] })],
 );
 
 // ─── Catalog ────────────────────────────────────────────────────────────────
@@ -223,8 +324,11 @@ export const order = pgTable(
     connectionId: uuid().references(() => integrationConnection.id, { onDelete: 'set null' }),
     provider: integrationProvider().notNull(),
     externalId: text().notNull(),
-    customerName: text(),
-    customerPhone: text(),
+    /** Customer name encrypted with the organization data key. */
+    customerNameEncrypted: text(),
+    /** HMAC of the normalized phone with an organization-derived key: matches repeat customers without storing the number. */
+    customerPhoneHash: text(),
+    customerPhoneLast3: text(),
     city: text(),
     sourceStatus: text().notNull(),
     category: orderStatusCategory(),
@@ -241,7 +345,7 @@ export const order = pgTable(
   (t) => [
     uniqueIndex().on(t.organizationId, t.provider, t.externalId),
     index().on(t.organizationId, t.sourceCreatedAt),
-    index().on(t.organizationId, t.customerPhone),
+    index().on(t.organizationId, t.customerPhoneHash),
   ],
 );
 

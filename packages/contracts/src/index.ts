@@ -9,7 +9,12 @@ export const HealthResponse = z.object({
 });
 export type HealthResponse = z.infer<typeof HealthResponse>;
 
-export const WebhookAck = z.object({ ok: z.boolean(), eventId: z.string().uuid().optional() });
+export const WebhookAck = z.object({
+  ok: z.boolean(),
+  eventId: z.string().uuid().optional(),
+  /** True when the payload was identical to the last one seen for this object. */
+  duplicate: z.boolean().optional(),
+});
 export type WebhookAck = z.infer<typeof WebhookAck>;
 
 /** pg-boss queue names shared by apps/api (producer) and apps/worker (consumer). */

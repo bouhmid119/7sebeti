@@ -1,67 +1,70 @@
-import { type Db, schema } from '@7sebeti/db';
-import type { Currency } from '@7sebeti/domain';
-import { categorizeStatus, normalizePhone, type StatusRule, toMinor } from '@7sebeti/domain';
-import { converty } from '@7sebeti/integrations';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, type Db, eq, schema, sql, withTenant } from '@7sebeti/db';
+import type { Currency, StatusRule } from '@7sebeti/domain';
+import { categorizeStatus, normalizePhone, toMinor } from '@7sebeti/domain';
+import { converty, encryptField, hashPhone, openPayload } from '@7sebeti/integrations';
 
 const { inboundEvent, order, orderEvent, orderLine, organization, statusMapping } = schema;
 
+export interface IngestDeps {
+  db: Db;
+  dataKeyFor: (organizationId: string) => Promise<Buffer>;
+}
+
 /**
- * Turn one stored inbound event into order / order_line / order_event rows.
- * Idempotent: replaying the same event (or an older one) never double-counts.
+ * Turn one stored inbound event into order / order_line / order_event rows, under the
+ * organization's RLS context. Idempotent: replaying the same event (or an older one)
+ * never double-counts. Personal data is written encrypted (name) or keyed-hashed (phone).
  */
-export async function ingestOrderEvent(db: Db, eventId: string): Promise<'processed' | 'stale' | 'ignored'> {
-  const [event] = await db.select().from(inboundEvent).where(eq(inboundEvent.id, eventId)).limit(1);
-  if (!event) throw new Error(`inbound_event ${eventId} not found`);
-  if (event.status === 'processed') return 'processed';
+export async function ingestOrderEvent(
+  { db, dataKeyFor }: IngestDeps,
+  eventId: string,
+): Promise<'processed' | 'stale' | 'ignored'> {
+  // Routing read as the owner role: the job only carries the event id.
+  const [meta] = await db
+    .select({ organizationId: inboundEvent.organizationId, status: inboundEvent.status })
+    .from(inboundEvent)
+    .where(eq(inboundEvent.id, eventId))
+    .limit(1);
+  if (!meta) throw new Error(`inbound_event ${eventId} not found`);
+  if (meta.status === 'processed') return 'processed';
+  const orgId = meta.organizationId;
 
   try {
-    const normalized = converty.convertySource.parseWebhook(event.payload);
-    if (!normalized) {
-      await markEvent(db, eventId, 'processed', 'not an order payload');
-      return 'ignored';
-    }
+    const dataKey = await dataKeyFor(orgId);
+    const result = await withTenant(db, orgId, async (tx) => {
+      const [event] = await tx.select().from(inboundEvent).where(eq(inboundEvent.id, eventId)).limit(1);
+      const [org] = await tx.select().from(organization).where(eq(organization.id, orgId)).limit(1);
+      if (!event || !org) throw new Error(`event or organization not visible for ${orgId}`);
 
-    const [org] = await db
-      .select()
-      .from(organization)
-      .where(eq(organization.id, event.organizationId))
-      .limit(1);
-    if (!org) throw new Error(`organization ${event.organizationId} not found`);
-    const currency = org.currency as Currency;
+      const normalized = converty.convertySource.parseWebhook(openPayload(event.payloadEncrypted, dataKey));
+      if (!normalized) return 'ignored' as const;
+      const currency = org.currency as Currency;
 
-    const rules: StatusRule[] = (
-      await db
-        .select()
-        .from(statusMapping)
-        .where(and(eq(statusMapping.organizationId, org.id), eq(statusMapping.provider, 'converty')))
-    ).map((r) => ({ match: r.match, kind: r.kind, category: r.category }));
-    const categorize = (status: string) =>
-      (rules.length > 0 ? categorizeStatus(status, rules) : null) ?? categorizeStatus(status);
+      const rules: StatusRule[] = (
+        await tx.select().from(statusMapping).where(eq(statusMapping.provider, 'converty'))
+      ).map((r) => ({ match: r.match, kind: r.kind, category: r.category }));
+      const categorize = (status: string) =>
+        (rules.length > 0 ? categorizeStatus(status, rules) : null) ?? categorizeStatus(status);
 
-    const result = await db.transaction(async (tx) => {
       const [existing] = await tx
         .select({ id: order.id, sourceUpdatedAt: order.sourceUpdatedAt, hadUpsell: order.hadUpsell })
         .from(order)
-        .where(
-          and(
-            eq(order.organizationId, org.id),
-            eq(order.provider, 'converty'),
-            eq(order.externalId, normalized.externalId),
-          ),
-        )
+        .where(and(eq(order.provider, 'converty'), eq(order.externalId, normalized.externalId)))
         .for('update')
         .limit(1);
-
       if (existing && existing.sourceUpdatedAt > normalized.sourceUpdatedAt) return 'stale' as const;
 
+      const phone = normalizePhone(normalized.customerPhone, org.country as 'TN');
       const values = {
-        organizationId: org.id,
+        organizationId: orgId,
         connectionId: event.connectionId,
         provider: 'converty' as const,
         externalId: normalized.externalId,
-        customerName: normalized.customerName,
-        customerPhone: normalizePhone(normalized.customerPhone, org.country as 'TN') || null,
+        customerNameEncrypted: normalized.customerName
+          ? encryptField(normalized.customerName, dataKey)
+          : null,
+        customerPhoneHash: phone ? hashPhone(phone, dataKey) : null,
+        customerPhoneLast3: phone ? phone.slice(-3) : null,
         city: normalized.city,
         sourceStatus: normalized.sourceStatus,
         category: categorize(normalized.sourceStatus),
@@ -90,7 +93,7 @@ export async function ingestOrderEvent(db: Db, eventId: string): Promise<'proces
       if (normalized.lines.length > 0) {
         await tx.insert(orderLine).values(
           normalized.lines.map((l) => ({
-            organizationId: org.id,
+            organizationId: orgId,
             orderId: row.id,
             externalProductKey: l.externalProductKey,
             productName: l.productName,
@@ -105,7 +108,7 @@ export async function ingestOrderEvent(db: Db, eventId: string): Promise<'proces
           .insert(orderEvent)
           .values(
             normalized.events.map((e) => ({
-              organizationId: org.id,
+              organizationId: orgId,
               orderId: row.id,
               sourceStatus: e.sourceStatus,
               category: categorize(e.sourceStatus),
@@ -119,7 +122,7 @@ export async function ingestOrderEvent(db: Db, eventId: string): Promise<'proces
       return 'processed' as const;
     });
 
-    await markEvent(db, eventId, 'processed', result === 'stale' ? 'stale' : null);
+    await markEvent(db, eventId, 'processed', result === 'processed' ? null : result);
     return result;
   } catch (err) {
     await markEvent(db, eventId, 'failed', err instanceof Error ? err.message : String(err));
