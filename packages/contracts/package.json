@@ -1,0 +1,17 @@
+{
+  "name": "@7sebeti/contracts",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@7sebeti/config": "workspace:*"
+  }
+}

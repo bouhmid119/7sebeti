@@ -1,0 +1,15 @@
+{
+  "name": "@7sebeti/domain",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@7sebeti/config": "workspace:*"
+  }
+}
