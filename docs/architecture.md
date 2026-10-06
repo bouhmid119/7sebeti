@@ -59,7 +59,7 @@ Choix et raisons :
 - Rôles en enum (`owner`, `admin`, `agent`, `viewer`) + permissions par module ; abonnement et modules activés sur l'organisation.
 - Chaque table métier porte `organization_id`, avec la **Row-Level Security Postgres** en garde-fou contre les fuites entre marchands.
 
-**Argent.** `numeric(14,3)` partout (le dinar a 3 décimales), devise sur l'organisation. Prépare l'Algérie, le Maroc et le Canada évoqués au meeting.
+**Argent.** Entiers `bigint` en unités mineures (millimes pour le TND, qui a 3 décimales), devise sur l'organisation. Prépare l'Algérie, le Maroc et le Canada évoqués au meeting.
 
 **Commandes normalisées au lieu de recalculs sur JSON :**
 - `order` (source, id externe, client, statut normalisé + statut brut, montants), `order_line` (produit, quantité, prix, est_upsell), `order_event` (historique : statut, tentative, agent, horodatage).

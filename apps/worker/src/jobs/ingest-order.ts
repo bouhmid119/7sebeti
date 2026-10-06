@@ -90,6 +90,7 @@ export async function ingestOrderEvent(db: Db, eventId: string): Promise<'proces
       if (normalized.lines.length > 0) {
         await tx.insert(orderLine).values(
           normalized.lines.map((l) => ({
+            organizationId: org.id,
             orderId: row.id,
             externalProductKey: l.externalProductKey,
             productName: l.productName,
@@ -104,6 +105,7 @@ export async function ingestOrderEvent(db: Db, eventId: string): Promise<'proces
           .insert(orderEvent)
           .values(
             normalized.events.map((e) => ({
+              organizationId: org.id,
               orderId: row.id,
               sourceStatus: e.sourceStatus,
               category: categorize(e.sourceStatus),

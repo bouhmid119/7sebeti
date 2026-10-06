@@ -1,5 +1,5 @@
 {
-  "id": "c4f32eb0-a6b3-4813-85f6-6309383aaa24",
+  "id": "33391b2d-b7bc-48c1-997d-eb027e43a53a",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -8,6 +8,12 @@
       "name": "bundle_component",
       "schema": "",
       "columns": {
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
         "bundle_id": {
           "name": "bundle_id",
           "type": "uuid",
@@ -30,6 +36,19 @@
       },
       "indexes": {},
       "foreignKeys": {
+        "bundle_component_organization_id_organization_id_fk": {
+          "name": "bundle_component_organization_id_organization_id_fk",
+          "tableFrom": "bundle_component",
+          "tableTo": "organization",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
         "bundle_component_bundle_id_product_id_fk": {
           "name": "bundle_component_bundle_id_product_id_fk",
           "tableFrom": "bundle_component",
@@ -400,8 +419,8 @@
           "primaryKey": false,
           "notNull": false
         },
-        "webhook_secret": {
-          "name": "webhook_secret",
+        "webhook_secret_hash": {
+          "name": "webhook_secret_hash",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -834,6 +853,12 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
         "order_id": {
           "name": "order_id",
           "type": "uuid",
@@ -899,24 +924,22 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "order_event_order_id_index": {
-          "name": "order_event_order_id_index",
-          "columns": [
-            {
-              "expression": "order_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {
+        "order_event_organization_id_organization_id_fk": {
+          "name": "order_event_organization_id_organization_id_fk",
+          "tableFrom": "order_event",
+          "tableTo": "organization",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
         "order_event_order_id_order_id_fk": {
           "name": "order_event_order_id_order_id_fk",
           "tableFrom": "order_event",
@@ -947,6 +970,12 @@
           "primaryKey": true,
           "notNull": true,
           "default": "gen_random_uuid()"
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
         },
         "order_id": {
           "name": "order_id",
@@ -1004,6 +1033,19 @@
         }
       },
       "foreignKeys": {
+        "order_line_organization_id_organization_id_fk": {
+          "name": "order_line_organization_id_organization_id_fk",
+          "tableFrom": "order_line",
+          "tableTo": "organization",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
         "order_line_order_id_order_id_fk": {
           "name": "order_line_order_id_order_id_fk",
           "tableFrom": "order_line",

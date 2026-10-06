@@ -3,6 +3,7 @@ CREATE TYPE "public"."integration_provider" AS ENUM('converty', 'converty_sheets
 CREATE TYPE "public"."member_role" AS ENUM('owner', 'admin', 'agent', 'viewer');--> statement-breakpoint
 CREATE TYPE "public"."order_status_category" AS ENUM('pending', 'no_answer', 'callback', 'confirmed', 'refused', 'shipped', 'delivered', 'returned', 'ignored');--> statement-breakpoint
 CREATE TABLE "bundle_component" (
+	"organization_id" uuid NOT NULL,
 	"bundle_id" uuid NOT NULL,
 	"component_id" uuid NOT NULL,
 	"quantity" integer DEFAULT 1 NOT NULL,
@@ -44,7 +45,7 @@ CREATE TABLE "integration_connection" (
 	"external_account_id" text,
 	"credentials_encrypted" text,
 	"credentials_expire_at" timestamp with time zone,
-	"webhook_secret" text,
+	"webhook_secret_hash" text,
 	"is_active" boolean DEFAULT true NOT NULL,
 	"last_sync_at" timestamp with time zone,
 	"last_sync_error" text,
@@ -86,6 +87,7 @@ CREATE TABLE "order" (
 --> statement-breakpoint
 CREATE TABLE "order_event" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"organization_id" uuid NOT NULL,
 	"order_id" uuid NOT NULL,
 	"source_status" text NOT NULL,
 	"category" "order_status_category",
@@ -96,6 +98,7 @@ CREATE TABLE "order_event" (
 --> statement-breakpoint
 CREATE TABLE "order_line" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"organization_id" uuid NOT NULL,
 	"order_id" uuid NOT NULL,
 	"external_product_key" text NOT NULL,
 	"product_name" text,
@@ -153,6 +156,7 @@ CREATE TABLE "user" (
 	CONSTRAINT "user_email_unique" UNIQUE("email")
 );
 --> statement-breakpoint
+ALTER TABLE "bundle_component" ADD CONSTRAINT "bundle_component_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "bundle_component" ADD CONSTRAINT "bundle_component_bundle_id_product_id_fk" FOREIGN KEY ("bundle_id") REFERENCES "public"."product"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "bundle_component" ADD CONSTRAINT "bundle_component_component_id_product_id_fk" FOREIGN KEY ("component_id") REFERENCES "public"."product"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "external_product_link" ADD CONSTRAINT "external_product_link_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -164,7 +168,9 @@ ALTER TABLE "membership" ADD CONSTRAINT "membership_organization_id_organization
 ALTER TABLE "membership" ADD CONSTRAINT "membership_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "order" ADD CONSTRAINT "order_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "order" ADD CONSTRAINT "order_connection_id_integration_connection_id_fk" FOREIGN KEY ("connection_id") REFERENCES "public"."integration_connection"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "order_event" ADD CONSTRAINT "order_event_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "order_event" ADD CONSTRAINT "order_event_order_id_order_id_fk" FOREIGN KEY ("order_id") REFERENCES "public"."order"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "order_line" ADD CONSTRAINT "order_line_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "order_line" ADD CONSTRAINT "order_line_order_id_order_id_fk" FOREIGN KEY ("order_id") REFERENCES "public"."order"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "product" ADD CONSTRAINT "product_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "status_mapping" ADD CONSTRAINT "status_mapping_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -177,7 +183,6 @@ CREATE UNIQUE INDEX "order_organization_id_provider_external_id_index" ON "order
 CREATE INDEX "order_organization_id_source_created_at_index" ON "order" USING btree ("organization_id","source_created_at");--> statement-breakpoint
 CREATE INDEX "order_organization_id_customer_phone_index" ON "order" USING btree ("organization_id","customer_phone");--> statement-breakpoint
 CREATE UNIQUE INDEX "order_event_order_id_occurred_at_source_status_index" ON "order_event" USING btree ("order_id","occurred_at","source_status");--> statement-breakpoint
-CREATE INDEX "order_event_order_id_index" ON "order_event" USING btree ("order_id");--> statement-breakpoint
 CREATE INDEX "order_line_order_id_index" ON "order_line" USING btree ("order_id");--> statement-breakpoint
 CREATE INDEX "product_organization_id_index" ON "product" USING btree ("organization_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "status_mapping_organization_id_provider_match_kind_index" ON "status_mapping" USING btree ("organization_id","provider","match","kind");

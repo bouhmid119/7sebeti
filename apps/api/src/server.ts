@@ -1,9 +1,9 @@
-import { createDb } from '@7sebeti/db';
+import { QUEUES } from '@7sebeti/contracts';
+import { createDb, inTransaction } from '@7sebeti/db';
 import { serve } from '@hono/node-server';
 import { PgBoss } from 'pg-boss';
 import { createApp } from './app';
 import { loadEnv } from './env';
-import { INBOUND_EVENT_QUEUE } from './routes/webhooks';
 
 const env = loadEnv();
 const { db, client } = createDb(env.DATABASE_URL);
@@ -11,11 +11,14 @@ const { db, client } = createDb(env.DATABASE_URL);
 const boss = new PgBoss(env.DATABASE_URL);
 boss.on('error', (err) => console.error('[pg-boss]', err));
 await boss.start();
-await boss.createQueue(INBOUND_EVENT_QUEUE);
+await boss.createQueue(QUEUES.inboundEvent);
 
 const app = createApp({
   db,
-  enqueue: (queue, data) => boss.send(queue, data),
+  withTransaction: (fn) =>
+    inTransaction(db, ({ db: txDb, executeSql }) =>
+      fn({ db: txDb, enqueue: (queue, data) => boss.send(queue, data, { db: { executeSql } }) }),
+    ),
   appUrl: env.APP_URL,
   version: env.RENDER_GIT_COMMIT ?? 'dev',
 });

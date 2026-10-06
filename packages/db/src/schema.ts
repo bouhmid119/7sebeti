@@ -97,8 +97,8 @@ export const integrationConnection = pgTable(
     /** AES-GCM ciphertext of the provider credentials (tokens). Never sent to the client. */
     credentialsEncrypted: text(),
     credentialsExpireAt: timestamp({ withTimezone: true }),
-    /** Random per-connection secret embedded in the webhook URL (Converty does not sign payloads). */
-    webhookSecret: text(),
+    /** SHA-256 of the random secret embedded in the webhook URL (Converty does not sign payloads). */
+    webhookSecretHash: text(),
     isActive: boolean().notNull().default(true),
     lastSyncAt: timestamp({ withTimezone: true }),
     lastSyncError: text(),
@@ -157,6 +157,7 @@ export const product = pgTable(
 export const bundleComponent = pgTable(
   'bundle_component',
   {
+    organizationId: orgRef(),
     bundleId: uuid()
       .notNull()
       .references(() => product.id, { onDelete: 'cascade' }),
@@ -248,6 +249,7 @@ export const orderLine = pgTable(
   'order_line',
   {
     id: id(),
+    organizationId: orgRef(),
     orderId: uuid()
       .notNull()
       .references(() => order.id, { onDelete: 'cascade' }),
@@ -265,6 +267,7 @@ export const orderEvent = pgTable(
   'order_event',
   {
     id: id(),
+    organizationId: orgRef(),
     orderId: uuid()
       .notNull()
       .references(() => order.id, { onDelete: 'cascade' }),
@@ -274,5 +277,5 @@ export const orderEvent = pgTable(
     actor: text(),
     occurredAt: timestamp({ withTimezone: true }).notNull(),
   },
-  (t) => [uniqueIndex().on(t.orderId, t.occurredAt, t.sourceStatus), index().on(t.orderId)],
+  (t) => [uniqueIndex().on(t.orderId, t.occurredAt, t.sourceStatus)],
 );
