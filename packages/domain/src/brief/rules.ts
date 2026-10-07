@@ -39,10 +39,20 @@ function count(value: string | null, singular: string, plural = `${singular}s`):
   return `${value} ${Math.abs(n) < 2 ? singular : plural}`;
 }
 
-/** Phrases par code de signal. `agent` est le vrai nom (le payload n'a que le pseudonyme). */
-function textFor(s: BriefSignal, agent: string | undefined): Text {
+/** Valeur brute d'un chiffre du signal, pour choisir une phrase (jamais pour l'écrire). */
+function raw(source: Signal | undefined, key: string): number | null {
+  const v = source?.figures[key];
+  return typeof v === 'number' ? v : null;
+}
+
+/**
+ * Phrases par code de signal. `source` est le signal d'origine : vrai nom de l'agent (le payload
+ * n'a que le pseudonyme) et valeurs brutes pour choisir la tournure. Les chiffres écrits viennent
+ * toujours du payload.
+ */
+function textFor(s: BriefSignal, source: Signal | undefined): Text {
   const f = (key: string) => show(s.chiffres[key]);
-  const who = subjectName(s, agent);
+  const who = subjectName(s, source?.subject.agent);
   const code: SignalId = s.code;
   switch (code) {
     case 'C1': {
@@ -62,7 +72,7 @@ function textFor(s: BriefSignal, agent: string | undefined): Text {
         titre: `Confirmation basse : ${who}`,
         constat: sentence([
           `Taux de confirmation de ${f('tauxPct')} sur ${f('jours')} jours (${f('leads')} leads), pour un objectif de ${f('objectifPct')}.`,
-          f('commandesManquees') &&
+          (raw(source, 'commandesManquees') ?? 0) > 0 &&
             `Environ ${count(f('commandesManquees'), 'commande manquée', 'commandes manquées')}.`,
         ]),
         action: 'Écoutez quelques appels et vérifiez le script, le prix annoncé et le délai de livraison.',
@@ -70,7 +80,7 @@ function textFor(s: BriefSignal, agent: string | undefined): Text {
     case 'C3':
       return {
         titre: `${who} sous ses objectifs`,
-        constat: `${f('tauxPct')} de confirmation et ${f('confirmeesParJour')} commandes confirmées par jour, pour un objectif de ${s.seuil}.`,
+        constat: `${f('tauxPct')} de confirmation et ${count(f('confirmeesParJour'), 'commande confirmée', 'commandes confirmées')} par jour, pour un objectif de ${s.seuil}.`,
         action: `Faites le point avec ${who} et écoutez quelques appels ensemble.`,
       };
     case 'C4':
@@ -89,14 +99,23 @@ function textFor(s: BriefSignal, agent: string | undefined): Text {
         action: 'Coupez cette pub ou baissez fortement son budget.',
       };
     }
-    case 'P2':
+    case 'P2': {
+      const perDay = raw(source, 'depenseParJourMinor');
+      const cap = raw(source, 'plafondParJourMinor');
       return {
         titre: `Pub à scaler : ${who}`,
-        constat: `CPA de ${f('cpa')} pour une cible de ${f('cpaCible')}, avec ${count(f('achats'), 'achat')} en ${f('jours')} jours.`,
-        action: f('plafondParJour')
-          ? `Augmentez le budget par paliers, sans dépasser ${f('plafondParJour')} par jour.`
-          : 'Augmentez le budget par paliers en surveillant le CPA.',
+        constat: sentence([
+          `CPA de ${f('cpa')} pour une cible de ${f('cpaCible')}, avec ${count(f('achats'), 'achat')} en ${f('jours')} jours.`,
+          f('depenseParJour') && `Dépense actuelle : ${f('depenseParJour')} par jour.`,
+        ]),
+        action:
+          perDay !== null && cap !== null && perDay >= cap
+            ? `Gardez ce budget : il atteint déjà le plafond de ${f('plafondParJour')} par jour.`
+            : f('plafondParJour')
+              ? `Augmentez le budget par paliers, sans dépasser ${f('plafondParJour')} par jour.`
+              : 'Augmentez le budget par paliers en surveillant le CPA.',
       };
+    }
     case 'P3':
       return {
         titre: `Fatigue créative : ${who}`,
@@ -109,11 +128,16 @@ function textFor(s: BriefSignal, agent: string | undefined): Text {
         constat: `CPL au-dessus du break-even de ${f('cplBreakEven')} ${f('jours')} jours de suite (${f('cplParJour')}).`,
         action: 'Revoyez le ciblage ou la créa, ou baissez le budget de ce produit.',
       };
+    // P5 sort aussi quand le coût est saisi mais que la marge avant pub est nulle ou négative.
     case 'P5':
       return {
-        titre: `Coût d'achat manquant : ${who}`,
-        constat: `${f('depense')} dépensés en pub sur ${f('jours')} jours sans coût d'achat renseigné : impossible de juger la rentabilité.`,
-        action: "Renseignez le coût d'achat de ce produit dans 7sebeti.",
+        titre: `Coûts à vérifier : ${s.sujet.produit ?? who}`,
+        constat: sentence([
+          `${f('depense')} dépensés en pub sur ${f('jours')} jours`,
+          s.sujet.pub ? `(pub ${s.sujet.pub})` : null,
+          "alors que le coût d'achat manque ou que la marge avant pub n'est pas positive : impossible de juger ces pubs.",
+        ]),
+        action: "Vérifiez le prix de vente et le coût d'achat de ce produit dans 7sebeti.",
       };
     case 'L1':
       return {
@@ -123,9 +147,25 @@ function textFor(s: BriefSignal, agent: string | undefined): Text {
       };
     case 'L2': {
       const zone = s.sujet.zone !== undefined;
+      const constat = `${f('tauxPct')} de livraison sur ${f('colis')} colis en ${f('jours')} jours, contre ${f('moyennePct')} en moyenne.`;
+      // Le seau « ? » regroupe les commandes sans gouvernorat reconnu ou sans transporteur :
+      // le problème est la saisie, pas une zone ni un transporteur.
+      if ((zone ? source?.subject.governorate : source?.subject.carrier) === '?') {
+        return zone
+          ? {
+              titre: 'Livraison faible : gouvernorat non reconnu',
+              constat,
+              action: "Vérifiez l'adresse et le gouvernorat à la confirmation de ces commandes.",
+            }
+          : {
+              titre: 'Livraison faible : transporteur non renseigné',
+              constat,
+              action: 'Renseignez le transporteur de chaque commande expédiée.',
+            };
+      }
       return {
         titre: zone ? `Zone faible : ${who}` : `Transporteur faible : ${who}`,
-        constat: `${f('tauxPct')} de livraison sur ${f('colis')} colis en ${f('jours')} jours, contre ${f('moyennePct')} en moyenne.`,
+        constat,
         action: zone
           ? 'Vérifiez les colis de cette zone et changez de transporteur si le problème dure.'
           : 'Vérifiez les colis confiés à ce transporteur et changez-en si le problème dure.',
@@ -138,13 +178,19 @@ function textFor(s: BriefSignal, agent: string | undefined): Text {
         action: "Passez la commande fournisseur dès aujourd'hui.",
       };
     case 'S2': {
+      // Deux causes : aucune vente depuis longtemps, ou des ventes trop lentes pour le stock.
+      const daysOfStock = f('joursDeStock');
       const noSale = f('joursSansVente');
       const value = f('valeurStock');
+      const stock = `${count(f('stock'), 'pièce')} en stock`;
       return {
         titre: `Stock dormant : ${who}`,
         constat: sentence([
-          `${count(f('stock'), 'pièce')} en stock`,
-          noSale ? `et aucune vente depuis ${count(noSale, 'jour')}.` : 'et aucune vente enregistrée.',
+          daysOfStock
+            ? `${stock}, soit ${count(daysOfStock, 'jour')} de ventes au rythme actuel.`
+            : noSale
+              ? `${stock} et aucune vente depuis ${count(noSale, 'jour')}.`
+              : `${stock} et aucune vente enregistrée.`,
           value && `Valeur du stock : ${value}.`,
         ]),
         action: "Écoulez ce stock (offre, pack, relance) avant d'en racheter.",
@@ -159,20 +205,22 @@ function textFor(s: BriefSignal, agent: string | undefined): Text {
   }
 }
 
+/** Au plus deux actions du même code, pour qu'un brief ne soit pas fait de cinq agents ou cinq pubs. */
+export const RULES_MAX_PER_CODE = 2;
+
 /**
  * Brief à partir des signaux seuls, dans l'ordre reçu (déjà trié par argent en jeu),
- * cinq actions au plus. Les vrais noms d'agents viennent des signaux, pas du payload.
+ * cinq actions au plus, deux par code. Les vrais noms d'agents viennent des signaux.
  */
 export function briefFromRules(prepared: PreparedBrief, signals: readonly Signal[]): BriefContent {
-  const kept = prepared.payload.signaux.slice(0, BRIEF_MAX_ACTIONS);
-  const actions = kept.map((s, i): BriefAction => {
+  const perCode = new Map<string, number>();
+  const actions: BriefAction[] = [];
+  prepared.payload.signaux.forEach((s, i) => {
+    const used = perCode.get(s.code) ?? 0;
+    if (actions.length >= BRIEF_MAX_ACTIONS || used >= RULES_MAX_PER_CODE) return;
+    perCode.set(s.code, used + 1);
     const source = signals[i];
-    return {
-      signal: s.ref,
-      code: s.code,
-      ...textFor(s, source?.subject.agent),
-      lien: source?.link ?? '/actions',
-    };
+    actions.push({ signal: s.ref, code: s.code, ...textFor(s, source), lien: source?.link ?? '/actions' });
   });
   const first = actions[0];
   const more = prepared.payload.signaux.length + prepared.payload.signauxNonDetailles > actions.length;

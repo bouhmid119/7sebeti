@@ -33,7 +33,8 @@ export function presentBrief(
   if (brief.signals.length === 0) return { source: null, resume: null, actions: [], otherSignals: [] };
 
   let source: 'ai' | 'rules' = 'ai';
-  let content = brief.status === 'ready' ? brief.content : null;
+  // Un ancien brief « ready » sans action (avant que finalizeBrief ne le refuse) passe aux phrases fixes.
+  let content = brief.status === 'ready' && brief.content?.actions.length ? brief.content : null;
   if (!content) {
     source = 'rules';
     const prepared = brief.payload
@@ -49,4 +50,15 @@ export function presentBrief(
     actions: content.actions,
     otherSignals: describeSignals(brief.signals, options).filter((s) => !shown.has(s.signal)),
   };
+}
+
+/**
+ * Ce que le commerçant avait sous les yeux quand il a répondu sur un signal : le texte de Claude,
+ * une phrase fixe, ou la simple carte du signal (signal sans action rédigée). Mesure de la bêta.
+ */
+export type FeedbackShownAs = 'ai' | 'rules' | 'signal';
+
+export function shownAs(presentation: BriefPresentation, ref: string): FeedbackShownAs {
+  const isAction = presentation.actions.some((a) => a.signal === ref);
+  return isAction && presentation.source ? presentation.source : 'signal';
 }

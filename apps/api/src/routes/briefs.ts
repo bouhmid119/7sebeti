@@ -12,6 +12,8 @@ import {
   dayInTimeZone,
   presentBrief,
   type Signal,
+  type StoredBrief,
+  shownAs,
 } from '@7sebeti/domain';
 import { Hono } from 'hono';
 import type { AppDeps, AppEnv, MemberRole } from '../app';
@@ -29,10 +31,18 @@ const WRITERS: readonly MemberRole[] = ['owner', 'admin'];
 const HISTORY_DEFAULT = 14;
 const HISTORY_MAX = 60;
 
-/** AAAA-MM-JJ et un vrai jour du calendrier (le 2026-02-31 est refusé, pas reporté au 3 mars). */
+/**
+ * AAAA-MM-JJ et un vrai jour du calendrier : le 2026-02-31 est refusé (pas reporté au 3 mars),
+ * comme l'an 0000, que Postgres ne connaît pas.
+ */
 const isDay = (s: string) => {
   const ms = Date.parse(`${s}T00:00:00Z`);
-  return /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(ms) && new Date(ms).toISOString().startsWith(s);
+  return (
+    /^\d{4}-\d{2}-\d{2}$/.test(s) &&
+    s >= '0001-01-01' &&
+    !Number.isNaN(ms) &&
+    new Date(ms).toISOString().startsWith(s)
+  );
 };
 const isUuid = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
 /** Référence d'un signal dans un brief : s1, s2… */
@@ -49,6 +59,19 @@ const briefColumns = {
   updatedAt: schema.aiBrief.updatedAt,
 };
 
+type BriefRow = Pick<
+  typeof schema.aiBrief.$inferSelect,
+  'status' | 'signals' | 'payload' | 'pseudonyms' | 'content'
+>;
+
+const stored = (row: BriefRow): StoredBrief => ({
+  status: row.status,
+  signals: row.signals as Signal[],
+  payload: row.payload as BriefPayload | null,
+  pseudonyms: row.pseudonyms as Record<string, string> | null,
+  content: row.content as BriefContent | null,
+});
+
 async function organizationSettings(tx: Tx, organizationId: string) {
   const [org] = await tx
     .select({ timezone: schema.organization.timezone, currency: schema.organization.currency })
@@ -59,9 +82,14 @@ async function organizationSettings(tx: Tx, organizationId: string) {
 }
 
 /** Le brief d'un jour (ou d'aujourd'hui dans le fuseau de l'organisation), prêt à afficher. */
-async function loadBrief(tx: Tx, organizationId: string, day: string | 'today'): Promise<BriefView | null> {
+async function loadBrief(
+  tx: Tx,
+  organizationId: string,
+  day: string | 'today',
+  now: Date,
+): Promise<BriefView | null> {
   const { timezone, currency } = await organizationSettings(tx, organizationId);
-  const date = day === 'today' ? dayInTimeZone(new Date(), timezone) : day;
+  const date = day === 'today' ? dayInTimeZone(now, timezone) : day;
   const [row] = await tx
     .select(briefColumns)
     .from(schema.aiBrief)
@@ -77,16 +105,7 @@ async function loadBrief(tx: Tx, organizationId: string, day: string | 'today'):
         .where(eq(schema.aiBriefFeedback.briefId, row.id))
     ).map((f) => [f.signal, f.verdict]),
   );
-  const view = presentBrief(
-    {
-      status: row.status,
-      signals: row.signals as Signal[],
-      payload: row.payload as BriefPayload | null,
-      pseudonyms: row.pseudonyms as Record<string, string> | null,
-      content: row.content as BriefContent | null,
-    },
-    { asOf: row.briefDate, currency },
-  );
+  const view = presentBrief(stored(row), { asOf: row.briefDate, currency });
   return {
     id: row.id,
     date: row.briefDate,
@@ -99,7 +118,7 @@ async function loadBrief(tx: Tx, organizationId: string, day: string | 'today'):
   };
 }
 
-export function briefRoutes({ db, auth }: AppDeps) {
+export function briefRoutes({ db, auth, now = () => new Date() }: AppDeps) {
   const app = new Hono<AppEnv>();
   app.use('*', requireSession(auth), requireOrganization(db), requireRole(READERS));
 
@@ -124,7 +143,7 @@ export function briefRoutes({ db, auth }: AppDeps) {
 
   app.get('/today', async (c) => {
     const view = await withTenant(db, c.get('organizationId'), (tx) =>
-      loadBrief(tx, c.get('organizationId'), 'today'),
+      loadBrief(tx, c.get('organizationId'), 'today', now()),
     );
     return view ? c.json(view) : c.json({ error: "Pas encore de brief aujourd'hui" }, 404);
   });
@@ -133,12 +152,16 @@ export function briefRoutes({ db, auth }: AppDeps) {
     const date = c.req.param('date');
     if (!isDay(date)) return c.json({ error: 'Date invalide (AAAA-MM-JJ)' }, 400);
     const view = await withTenant(db, c.get('organizationId'), (tx) =>
-      loadBrief(tx, c.get('organizationId'), date),
+      loadBrief(tx, c.get('organizationId'), date, now()),
     );
     return view ? c.json(view) : c.json({ error: 'Pas de brief ce jour-là' }, 404);
   });
 
-  /** Retour du commerçant sur un signal : fait, pas pertinent, ou null pour l'effacer. */
+  /**
+   * Retour du commerçant sur un signal : fait, pas pertinent, ou null pour l'effacer. On garde ce
+   * qu'il avait sous les yeux (texte de Claude, phrase fixe ou carte du signal) : c'est la mesure
+   * de la bêta. Le front l'envoie ; sinon on le déduit du brief tel qu'il s'affiche maintenant.
+   */
   app.put('/:id/signals/:signal/feedback', requireRole(WRITERS), async (c) => {
     const id = c.req.param('id');
     const ref = c.req.param('signal');
@@ -146,15 +169,18 @@ export function briefRoutes({ db, auth }: AppDeps) {
     if (!isUuid(id) || signalIndex(ref) < 0 || !parsed.success) {
       return c.json({ error: 'Retour invalide' }, 400);
     }
-    const { feedback } = parsed.data;
+    const { feedback, shownAs: claimed } = parsed.data;
     const organizationId = c.get('organizationId');
     const userId = c.get('userId');
 
     const outcome = await withTenant(db, organizationId, async (tx) => {
       const [brief] = await tx
         .select({
+          briefDate: schema.aiBrief.briefDate,
           status: schema.aiBrief.status,
           signals: schema.aiBrief.signals,
+          payload: schema.aiBrief.payload,
+          pseudonyms: schema.aiBrief.pseudonyms,
           content: schema.aiBrief.content,
         })
         .from(schema.aiBrief)
@@ -169,7 +195,11 @@ export function briefRoutes({ db, auth }: AppDeps) {
         await tx.delete(schema.aiBriefFeedback).where(target);
         return 'ok' as const;
       }
-      const source = brief.status === 'ready' && brief.content ? 'ai' : 'rules';
+      let seen = claimed;
+      if (!seen) {
+        const { currency } = await organizationSettings(tx, organizationId);
+        seen = shownAs(presentBrief(stored(brief), { asOf: brief.briefDate, currency }), ref);
+      }
       await tx
         .insert(schema.aiBriefFeedback)
         .values({
@@ -178,12 +208,12 @@ export function briefRoutes({ db, auth }: AppDeps) {
           signalRef: ref,
           code: signal.id,
           verdict: feedback,
-          source,
+          shownAs: seen,
           userId,
         })
         .onConflictDoUpdate({
           target: [schema.aiBriefFeedback.briefId, schema.aiBriefFeedback.signalRef],
-          set: { verdict: feedback, source, userId, updatedAt: new Date() },
+          set: { verdict: feedback, shownAs: seen, userId, updatedAt: new Date() },
         });
       return 'ok' as const;
     });

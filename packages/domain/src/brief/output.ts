@@ -125,8 +125,10 @@ export function finalizeBrief(
     warnings.push(`${kept.length} actions proposées, ${BRIEF_MAX_ACTIONS} gardées`);
     kept.length = BRIEF_MAX_ACTIONS;
   }
+  // Un brief sans action alors que des signaux existent : échec, pour que le rattrapage du matin
+  // redemande, puis que l'écran passe aux phrases fixes.
   if (kept.length === 0 && prepared.payload.signaux.length > 0) {
-    warnings.push('aucune action retenue alors que des signaux existent');
+    return { ok: false, error: 'aucune action retenue alors que des signaux existent' };
   }
 
   const texts = [parsed.resume, ...kept.flatMap((a) => [a.titre, a.constat, a.action])];

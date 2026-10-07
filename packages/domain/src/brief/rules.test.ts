@@ -3,7 +3,7 @@ import type { Signal, SignalId } from '../signals';
 import { unknownNumbers } from './output';
 import { prepareBrief } from './payload';
 import { briefFromRules, describeSignals } from './rules';
-import { presentBrief } from './view';
+import { presentBrief, shownAs } from './view';
 
 const AS_OF = '2026-10-20';
 const product = { productId: 'p-uuid', product: 'Brosse lissante' };
@@ -173,7 +173,7 @@ describe('briefFromRules', () => {
     expect(action?.code).toBe(code);
     for (const text of [content.resume, action?.titre, action?.constat, action?.action]) {
       expect(text).toBeTruthy();
-      expect(text).not.toMatch(/null|undefined|\[object|Agent [A-Z]\b|\s[,.]|\.\./);
+      expect(text).not.toMatch(/\bnull\b|undefined|\[object|Agent [A-Z]\b|\s[,.]|\.\./);
       expect(unknownNumbers(text ?? '', prepared.payload)).toEqual([]);
     }
     expect(action?.lien).toBe(ALL[code].link);
@@ -242,6 +242,69 @@ describe('briefFromRules', () => {
   });
 });
 
+describe('briefFromRules, cas limites relevés en relecture', () => {
+  const constat = (sig: Signal) => rules([sig]).content.actions[0]?.constat;
+  const action = (sig: Signal) => rules([sig]).content.actions[0]?.action;
+
+  it("n'écrit pas « 0 commande manquée »", () => {
+    const c2: Signal = { ...ALL.C2, figures: { ...ALL.C2.figures, commandesManquees: 0 } };
+    expect(constat(c2)).not.toContain('Environ');
+  });
+
+  it('accorde les commandes confirmées par jour', () => {
+    const c3: Signal = { ...ALL.C3, figures: { tauxPct: 25, confirmeesParJour: 0.7 } };
+    expect(constat(c3)).toContain('0,7 commande confirmée par jour');
+  });
+
+  it('ne pousse pas à monter une pub déjà au plafond, et dit sa dépense actuelle', () => {
+    expect(constat(ALL.P2)).toContain('Dépense actuelle : 50,000 DT par jour.');
+    expect(action(ALL.P2)).toBe('Augmentez le budget par paliers, sans dépasser 150,000 DT par jour.');
+    const atCap: Signal = { ...ALL.P2, figures: { ...ALL.P2.figures, depenseParJourMinor: 180_000 } };
+    expect(action(atCap)).toBe('Gardez ce budget : il atteint déjà le plafond de 150,000 DT par jour.');
+  });
+
+  it('nomme le produit à vérifier, pas la pub, et ne suppose pas que le coût manque', () => {
+    const [a] = rules([ALL.P5]).content.actions;
+    expect(a?.titre).toBe('Coûts à vérifier : Brosse lissante');
+    expect(a?.constat).toContain('(pub Vidéo avant/après)');
+    expect(a?.constat).toContain("le coût d'achat manque ou que la marge avant pub n'est pas positive");
+  });
+
+  it('explique un stock dormant par la lenteur des ventes ou par leur absence', () => {
+    const slow: Signal = {
+      ...ALL.S2,
+      figures: { stock: 120, joursSansVente: 1, joursDeStock: 420, valeurStockMinor: null },
+    };
+    expect(constat(slow)).toBe('120 pièces en stock, soit 420 jours de ventes au rythme actuel.');
+    expect(constat(ALL.S2)).toBe(
+      '230 pièces en stock et aucune vente depuis 26 jours. Valeur du stock : 2 070,000 DT.',
+    );
+    const never: Signal = { ...ALL.S2, figures: { ...ALL.S2.figures, joursSansVente: null } };
+    expect(constat(never)).toContain('aucune vente enregistrée');
+  });
+
+  it('traite à part les commandes sans gouvernorat ou sans transporteur reconnu', () => {
+    const unknownZone: Signal = { ...ALL.L2, subject: { governorate: '?' } };
+    const unknownCarrier: Signal = { ...ALL.L2, title: 'Transporteur faible', subject: { carrier: '?' } };
+    const [zone, carrier] = rules([unknownZone, unknownCarrier]).content.actions;
+    expect(zone?.titre).toBe('Livraison faible : gouvernorat non reconnu');
+    expect(zone?.action).toContain('gouvernorat');
+    expect(carrier?.titre).toBe('Livraison faible : transporteur non renseigné');
+  });
+
+  it('garde au plus deux actions du même code, les suivantes restent des signaux', () => {
+    const agent = (name: string): Signal => ({
+      ...ALL.C3,
+      subject: { agent: name },
+      link: `/agents/${name}`,
+    });
+    const signals = [agent('Yasmine'), agent('Mehdi'), agent('Sarra'), agent('Amine'), ALL.L2];
+    const { content } = rules(signals);
+    expect(content.actions.map((a) => a.signal)).toEqual(['s1', 's2', 's5']);
+    expect(content.resume).toContain("D'autres signaux");
+  });
+});
+
 describe('describeSignals', () => {
   it('formate tous les signaux, au-delà des huit envoyés au modèle, avec les vrais noms', () => {
     const signals = Object.values(ALL);
@@ -291,6 +354,22 @@ describe('presentBrief', () => {
       expect(view.otherSignals.map((s) => s.signal)).toEqual(signals.slice(5).map((_, i) => `s${i + 6}`));
     },
   );
+
+  it("passe aux phrases fixes quand le texte de Claude n'a gardé aucune action", () => {
+    const empty = { resume: 'Une action : rappelez les leads.', actions: [] };
+    const view = presentBrief({ ...stored, status: 'ready', content: empty }, options);
+    expect(view.source).toBe('rules');
+    expect(view.actions).toHaveLength(5);
+  });
+
+  it('dit ce que le commerçant avait sous les yeux pour chaque signal', () => {
+    const ai = presentBrief({ ...stored, status: 'ready', content: aiContent }, options);
+    expect(shownAs(ai, 's3')).toBe('ai');
+    expect(shownAs(ai, 's1')).toBe('signal');
+    const fixed = presentBrief({ ...stored, status: 'signals_only', content: null }, options);
+    expect(shownAs(fixed, 's1')).toBe('rules');
+    expect(shownAs(fixed, 's9')).toBe('signal');
+  });
 
   it('refait le payload quand il manque', () => {
     const view = presentBrief(

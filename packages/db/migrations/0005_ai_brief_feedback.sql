@@ -1,4 +1,4 @@
-CREATE TYPE "public"."ai_brief_source" AS ENUM('ai', 'rules');--> statement-breakpoint
+CREATE TYPE "public"."ai_brief_shown_as" AS ENUM('ai', 'rules', 'signal');--> statement-breakpoint
 CREATE TYPE "public"."ai_brief_verdict" AS ENUM('done', 'not_relevant');--> statement-breakpoint
 CREATE TABLE "ai_brief_feedback" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
@@ -7,7 +7,7 @@ CREATE TABLE "ai_brief_feedback" (
 	"signal_ref" text NOT NULL,
 	"code" text NOT NULL,
 	"verdict" "ai_brief_verdict" NOT NULL,
-	"source" "ai_brief_source" NOT NULL,
+	"shown_as" "ai_brief_shown_as" NOT NULL,
 	"user_id" uuid,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL

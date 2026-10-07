@@ -436,8 +436,11 @@ export const aiBrief = pgTable(
   (t) => [uniqueIndex().on(t.organizationId, t.briefDate), index().on(t.status, t.briefDate)],
 );
 
-/** Who wrote what the merchant read: Claude, or the fixed sentences used without the model. */
-export const aiBriefSource = pgEnum('ai_brief_source', ['ai', 'rules']);
+/**
+ * What the merchant had in front of them when answering on a signal: Claude's text, a fixed
+ * sentence (no model), or just the signal card (a signal without a written action).
+ */
+export const aiBriefShownAs = pgEnum('ai_brief_shown_as', ['ai', 'rules', 'signal']);
 
 /** done: the merchant did it. not_relevant: the signal did not apply to their shop. */
 export const aiBriefVerdict = pgEnum('ai_brief_verdict', ['done', 'not_relevant']);
@@ -459,7 +462,7 @@ export const aiBriefFeedback = pgTable(
     /** Signal code (C1…R1), for statistics without opening the brief. */
     code: text().notNull(),
     verdict: aiBriefVerdict().notNull(),
-    source: aiBriefSource().notNull(),
+    shownAs: aiBriefShownAs().notNull(),
     userId: uuid().references(() => user.id, { onDelete: 'set null' }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),

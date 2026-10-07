@@ -47,7 +47,7 @@ Ce que signifie chaque code, et le type d'action attendue :
 - P2, pub à scaler : augmenter le budget par paliers, sans dépasser le plafond par jour indiqué.
 - P3, fatigue créative : préparer une nouvelle créa et réduire la diffusion de l'actuelle.
 - P4, CPL au-dessus du break-even : revoir le ciblage ou la créa, ou baisser le budget du produit.
-- P5, coûts manquants : renseigner le coût d'achat du produit dans 7sebeti pour que les pubs soient jugées.
+- P5, coûts à vérifier : le coût d'achat du produit manque, ou sa marge avant pub n'est pas positive ; faire vérifier le prix de vente et le coût d'achat dans 7sebeti avant de juger ses pubs.
 - L1, livraison sous l'objectif : confirmer l'adresse et appeler le client la veille de la livraison.
 - L2, zone ou transporteur faible : vérifier les colis de cette zone ou de ce transporteur, et changer de transporteur si le problème dure.
 - S1, rupture proche : passer la commande fournisseur maintenant.

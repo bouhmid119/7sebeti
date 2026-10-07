@@ -4,7 +4,7 @@
  */
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { BriefHistoryItem, BriefView } from '@7sebeti/contracts';
-import { createDb, eq, schema, sql, withTenant } from '@7sebeti/db';
+import { and, createDb, eq, schema, sql, withTenant } from '@7sebeti/db';
 import { addDays, dayInTimeZone, prepareBrief, type Signal } from '@7sebeti/domain';
 import { parseKeyring } from '@7sebeti/integrations';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -14,6 +14,8 @@ import { createDataKeyCache } from './lib/data-keys';
 
 const url = process.env.DATABASE_URL;
 const APP_URL = 'http://localhost:5173';
+/** Fixed clock: « today » must not change if the suite runs across midnight in Tunis. */
+const NOW = new Date('2026-10-07T10:00:00Z');
 
 const SIGNALS: Signal[] = [
   {
@@ -65,11 +67,12 @@ describe.skipIf(!url)('brief API', () => {
     enqueueInTx: async () => undefined,
     appUrl: APP_URL,
     version: 'test',
+    now: () => NOW,
   });
 
   const orgs: string[] = [];
   const emails: string[] = [];
-  const today = dayInTimeZone(new Date(), 'Africa/Tunis');
+  const today = dayInTimeZone(NOW, 'Africa/Tunis');
   const yesterday = addDays(today, -1);
   let owner = '';
   let orgId = '';
@@ -140,15 +143,15 @@ describe.skipIf(!url)('brief API', () => {
           payload: prepared.payload,
           pseudonyms: prepared.pseudonyms,
           content: {
-            resume: 'Rappelez les leads, puis voyez Yasmine.',
+            resume: "Rappelez d'abord les leads d'hier.",
             actions: [
               {
-                signal: 's2',
-                code: 'C3',
-                titre: 'Yasmine sous ses objectifs',
-                constat: '41,2 % de confirmation.',
-                action: 'Écoutez trois appels avec Yasmine.',
-                lien: '/agents/Yasmine',
+                signal: 's1',
+                code: 'C1',
+                titre: "14 leads d'hier à rappeler",
+                constat: '966,000 DT de commandes en attente.',
+                action: 'Rappelez-les avant midi.',
+                lien: '/confirmation?jour=hier&statut=non-traite',
               },
             ],
           },
@@ -188,9 +191,10 @@ describe.skipIf(!url)('brief API', () => {
     expect(res.status).toBe(200);
     const view = (await res.json()) as BriefView;
     expect(view).toMatchObject({ id: todayId, date: today, status: 'ready', source: 'ai' });
-    expect(view.actions).toEqual([expect.objectContaining({ signal: 's2', code: 'C3', feedback: null })]);
-    expect(view.otherSignals.map((s) => s.signal)).toEqual(['s1', 's3']);
-    expect(view.otherSignals[0]?.enJeu).toBe('966,000 DT');
+    expect(view.actions).toEqual([expect.objectContaining({ signal: 's1', code: 'C1', feedback: null })]);
+    expect(view.otherSignals.map((s) => s.signal)).toEqual(['s2', 's3']);
+    // The agent's real name is restored on the card, never its pseudonym.
+    expect(view.otherSignals.find((s) => s.code === 'C3')?.sujet.agent).toBe('Yasmine');
     const raw = JSON.stringify(view);
     for (const hidden of ['pseudonyms', 'payload', 'warnings', 'chiffre absent', 'Agent A']) {
       expect(raw).not.toContain(hidden);
@@ -214,6 +218,7 @@ describe.skipIf(!url)('brief API', () => {
     expect((await get(`/api/briefs/${addDays(today, -30)}`, owner)).status).toBe(404);
     expect((await get('/api/briefs/2026-13-45', owner)).status).toBe(400);
     expect((await get('/api/briefs/2026-02-31', owner)).status).toBe(400);
+    expect((await get('/api/briefs/0000-01-01', owner)).status).toBe(400);
   });
 
   it("liste l'historique du plus récent au plus ancien", async () => {
@@ -225,26 +230,43 @@ describe.skipIf(!url)('brief API', () => {
   });
 
   it('enregistre, remplace et efface le retour sur un signal', async () => {
-    const path = `/api/briefs/${todayId}/signals/s2/feedback`;
+    const path = `/api/briefs/${todayId}/signals/s1/feedback`;
     expect((await put(path, owner, { feedback: 'done' })).status).toBe(200);
     expect(
-      (await put(`/api/briefs/${todayId}/signals/s1/feedback`, owner, { feedback: 'not_relevant' })).status,
+      (await put(`/api/briefs/${todayId}/signals/s2/feedback`, owner, { feedback: 'not_relevant' })).status,
     ).toBe(200);
     let view = (await (await get('/api/briefs/today', owner)).json()) as BriefView;
     expect(view.actions[0]?.feedback).toBe('done');
-    expect(view.otherSignals.find((s) => s.signal === 's1')?.feedback).toBe('not_relevant');
+    expect(view.otherSignals.find((s) => s.signal === 's2')?.feedback).toBe('not_relevant');
 
     expect((await put(path, owner, { feedback: 'not_relevant' })).status).toBe(200);
+    // What the merchant saw: Claude's text for s1, the bare card for s2, phrases fixes on another day.
+    expect(
+      (await put(`/api/briefs/${yesterdayId}/signals/s1/feedback`, owner, { feedback: 'done' })).status,
+    ).toBe(200);
     const rows = await db
       .select()
       .from(schema.aiBriefFeedback)
-      .where(eq(schema.aiBriefFeedback.briefId, todayId));
-    expect(rows).toHaveLength(2);
-    expect(rows.find((r) => r.signalRef === 's2')).toMatchObject({
-      code: 'C3',
+      .where(eq(schema.aiBriefFeedback.organizationId, orgId));
+    expect(rows).toHaveLength(3);
+    expect(rows.find((r) => r.briefId === todayId && r.signalRef === 's1')).toMatchObject({
+      code: 'C1',
       verdict: 'not_relevant',
-      source: 'ai',
+      shownAs: 'ai',
     });
+    expect(rows.find((r) => r.briefId === todayId && r.signalRef === 's2')).toMatchObject({
+      code: 'C3',
+      shownAs: 'signal',
+    });
+    expect(rows.find((r) => r.briefId === yesterdayId)).toMatchObject({ code: 'C1', shownAs: 'rules' });
+
+    // The front says what it showed (the brief may have turned « ready » since): that wins.
+    expect((await put(path, owner, { feedback: 'done', shownAs: 'rules' })).status).toBe(200);
+    const [kept] = await db
+      .select({ shownAs: schema.aiBriefFeedback.shownAs })
+      .from(schema.aiBriefFeedback)
+      .where(and(eq(schema.aiBriefFeedback.briefId, todayId), eq(schema.aiBriefFeedback.signalRef, 's1')));
+    expect(kept?.shownAs).toBe('rules');
 
     expect((await put(path, owner, { feedback: null })).status).toBe(200);
     view = (await (await get('/api/briefs/today', owner)).json()) as BriefView;
@@ -254,6 +276,10 @@ describe.skipIf(!url)('brief API', () => {
   it('refuse un retour mal formé, sur un signal ou un brief inconnu, ou venant d’un associé', async () => {
     expect(
       (await put(`/api/briefs/${todayId}/signals/s2/feedback`, owner, { feedback: 'peut-être' })).status,
+    ).toBe(400);
+    expect(
+      (await put(`/api/briefs/${todayId}/signals/s2/feedback`, owner, { feedback: 'done', shownAs: 'x' }))
+        .status,
     ).toBe(400);
     expect(
       (await put(`/api/briefs/${todayId}/signals/x2/feedback`, owner, { feedback: 'done' })).status,
@@ -279,7 +305,7 @@ describe.skipIf(!url)('brief API', () => {
         signalRef: 's1',
         code: 'C1',
         verdict: 'done',
-        source: 'rules',
+        shownAs: 'rules',
       }),
     );
     await expect(attempt).rejects.toThrow();

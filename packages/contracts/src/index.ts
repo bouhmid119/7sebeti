@@ -92,5 +92,13 @@ export const BriefHistoryItem = z.object({
 });
 export type BriefHistoryItem = z.infer<typeof BriefHistoryItem>;
 
-export const BriefFeedbackRequest = z.object({ feedback: BriefFeedback.nullable() });
+/** Ce que le commerçant avait sous les yeux : texte de Claude, phrase fixe ou simple carte du signal. */
+export const BriefShownAs = z.enum(['ai', 'rules', 'signal']);
+export type BriefShownAs = z.infer<typeof BriefShownAs>;
+
+/** shownAs est facultatif : sans lui, l'API le déduit du brief tel qu'il est affiché maintenant. */
+export const BriefFeedbackRequest = z.object({
+  feedback: BriefFeedback.nullable(),
+  shownAs: BriefShownAs.optional(),
+});
 export type BriefFeedbackRequest = z.infer<typeof BriefFeedbackRequest>;

@@ -1,6 +1,6 @@
 {
-  "id": "ef02506a-c081-4d25-816d-8a41469c1d16",
-  "prevId": "436483e8-4eab-4fa5-a038-9dbedd9c28ea",
+  "id": "237f5e11-27a1-4daa-94fb-49da1b0ad564",
+  "prevId": "7e1cfe35-673f-4cb0-9e1f-df726e07d9b3",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -360,9 +360,9 @@
           "primaryKey": false,
           "notNull": true
         },
-        "source": {
-          "name": "source",
-          "type": "ai_brief_source",
+        "shown_as": {
+          "name": "shown_as",
+          "type": "ai_brief_shown_as",
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
@@ -2321,12 +2321,13 @@
     }
   },
   "enums": {
-    "public.ai_brief_source": {
-      "name": "ai_brief_source",
+    "public.ai_brief_shown_as": {
+      "name": "ai_brief_shown_as",
       "schema": "public",
       "values": [
         "ai",
-        "rules"
+        "rules",
+        "signal"
       ]
     },
     "public.ai_brief_status": {

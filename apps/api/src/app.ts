@@ -25,6 +25,8 @@ export interface AppDeps {
   appUrl: string;
   version: string;
   log?: (line: string) => void;
+  /** Current time, for « today » in the organization's time zone (tests pin it). */
+  now?: () => Date;
 }
 
 export type MemberRole = (typeof schema.memberRole.enumValues)[number];

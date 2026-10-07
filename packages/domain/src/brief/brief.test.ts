@@ -231,6 +231,18 @@ describe('finalizeBrief', () => {
     expect(result.warnings).toEqual(['chiffre absent des données : 18', 'pseudonyme inconnu : Agent Z']);
   });
 
+  it("refuse une réponse dont aucune action n'est retenue alors que des signaux existent", () => {
+    const res = finalizeBrief(
+      {
+        resume: 'Une action : rappelez les leads.',
+        actions: [{ signal: 'S1', titre: 'a', constat: 'b', action: 'c' }],
+      },
+      prepared,
+      SIGNALS,
+    );
+    expect(res).toEqual({ ok: false, error: 'aucune action retenue alors que des signaux existent' });
+  });
+
   it('refuse une réponse hors format', () => {
     expect(finalizeBrief({ resume: 'r' }, prepared, SIGNALS)).toEqual({
       ok: false,
