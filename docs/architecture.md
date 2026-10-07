@@ -107,21 +107,19 @@ Chaque source implémente une interface commune dans `packages/integrations` :
 
 ## 8. Hébergement et coûts
 
-**Phase 1, démarrage (Render à Francfort + Cloudflare), environ 25 à 40 $/mois :**
+**Production : Scaleway, région Paris**, données dans l'UE chez un hébergeur établi dans l'UE (environ 27,6 $/mois en bêta selon la page Notion « Design d'architecture ») :
 
-| Service | Plan | Coût indicatif |
-|---|---|---|
-| `web` (Cloudflare Pages, app.7sebeti.com) | gratuit | 0 $ |
-| `api` (api.7sebeti.com) | Render Starter, toujours allumé | ~7 $ |
-| `worker` | Background worker Starter | ~7 $ |
-| PostgreSQL | Render Postgres Basic 1 GB (ou Neon Launch) | ~6 à 19 $ |
-| Erreurs | Sentry gratuit | 0 $ |
-| Disponibilité | Better Stack ou UptimeRobot gratuit | 0 $ |
-| Staging | même chose en plus petit, éteint la nuit | ~5 à 10 $ |
+| Élément | Service |
+|---|---|
+| API, worker, Caddy (TLS), sauvegarde de nuit | Instance DEV1-S, Docker Compose (`ops/deploy/`) |
+| PostgreSQL 17 | Managed Database DB-DEV-S, réseau privé uniquement |
+| Front | Cloudflare Pages, gratuit |
+| Sauvegardes hors région | Cloudflare R2 juridiction UE, chiffrées avec une clé que R2 ne détient pas |
+| Image | GitHub Container Registry |
 
-Ça colle au budget évoqué au meeting (~20-30 $/mois) et supprime le self-ping et les réveils de base de la v1. Prix à reconfirmer sur les grilles Render au moment de créer les services.
+Une seule image Docker sert l'API, le worker et les migrations, ce qui garde **Render Francfort** comme repli sans changer de code (`render.yaml`). Détails et procédure : `docs/deploy.md`.
 
-**Phase 2, quand le volume le justifie** : les mêmes conteneurs sur AWS (ECS Fargate + RDS) ou GCP (Cloud Run + Cloud SQL), Redis + BullMQ si pg-boss devient le goulot. Pas de changement de code applicatif.
+**Plus tard** : passer en DEV1-M si la RAM dépasse 75 %, séparer les workers par file (`WORKER_QUEUES`), puis une base plus grande. Pas de changement de code applicatif.
 
 ## 9. Migration depuis la v1
 
@@ -136,7 +134,7 @@ Chaque source implémente une interface commune dans `packages/integrations` :
 
 1. **Approche** : nouvelle structure, métier de la v1 porté dans `packages/domain` avec tests.
 2. **Cible** : SaaS multi-marchands dès la v2.
-3. **Hébergement phase 1** : Render (API, worker, Postgres) à Francfort, front sur Cloudflare Pages, DNS `7sebeti.com` chez Cloudflare.
+3. **Hébergement** : Scaleway Paris (VM DEV1-S en Docker Compose + PostgreSQL 17 managé), front sur Cloudflare Pages, DNS `7sebeti.com` chez Cloudflare, Render Francfort en repli avec la même image (décision d'Ahmed du 7 octobre 2026).
 4. **ORM** : Drizzle.
 
 Ces choix restent réversibles tant que le métier n'est pas porté.

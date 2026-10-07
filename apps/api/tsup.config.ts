@@ -1,10 +1,15 @@
 import { defineConfig } from 'tsup';
 
-// Workspace packages ship TypeScript sources, so they are bundled into the app.
+// Fully bundled: the production image ships this single file without node_modules.
+// The banner gives bundled CommonJS dependencies a working require().
 export default defineConfig({
   entry: ['src/server.ts'],
   format: ['esm'],
+  platform: 'node',
   target: 'node22',
   clean: true,
-  noExternal: [/^@7sebeti\//],
+  noExternal: [/.*/],
+  banner: {
+    js: "import { createRequire as __createRequire } from 'node:module'; const require = __createRequire(import.meta.url);",
+  },
 });

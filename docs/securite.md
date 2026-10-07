@@ -1,6 +1,6 @@
 # Sécurité des données
 
-Ce document décrit ce qui est en place dans le code. Les choix d'hébergement, de proxy et de fournisseur d'e-mail restent à trancher (page Notion « Design d'architecture », section 1).
+Ce document décrit ce qui est en place dans le code. Hébergement : Scaleway Paris (`docs/deploy.md`). Le proxy Cloudflare et le fournisseur d'e-mail restent à trancher (page Notion « Design d'architecture », section 1).
 
 ## Authentification
 
@@ -42,7 +42,7 @@ Ce document décrit ce qui est en place dans le code. Les choix d'hébergement, 
 
 ## Sauvegardes
 
-Scripts dans `ops/backup/`, à planifier une fois l'hébergement choisi :
+Scripts dans `ops/backup/`. En production, le service `backup` du compose (`ops/deploy/compose.yml`) lance `backup.sh` chaque nuit à 02:30 UTC :
 
 - `backup.sh`, chaque nuit : `pg_dump` compressé, chiffré avec la clé publique `age`, envoyé dans Cloudflare R2 en juridiction UE. Le dump du dimanche va dans `weekly/`. Règles de cycle de vie R2 : `daily/` 7 jours, `weekly/` 28 jours.
 - `restore-check.sh`, chaque mois : restaure le dernier dump sur une base jetable **dans la même région UE** (jamais sur un runner GitHub), puis compare les comptages avec la production (`compare-counts.sh`). Une sauvegarde jamais restaurée ne compte pas.
