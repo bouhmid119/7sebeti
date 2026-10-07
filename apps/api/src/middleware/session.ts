@@ -1,6 +1,6 @@
 import { and, type Db, eq, schema, withUser } from '@7sebeti/db';
 import type { MiddlewareHandler } from 'hono';
-import type { AppEnv } from '../app';
+import type { AppEnv, MemberRole } from '../app';
 import type { Auth } from '../lib/auth';
 
 /** Requires a valid session cookie; exposes `userId`. */
@@ -35,6 +35,15 @@ export function requireOrganization(db: Db): MiddlewareHandler<AppEnv> {
     );
     if (!member) return c.json({ error: 'Organisation inaccessible' }, 403);
     c.set('organizationId', organizationId);
+    c.set('role', member.role);
+    await next();
+  };
+}
+
+/** After requireOrganization: only these member roles get through. */
+export function requireRole(roles: readonly MemberRole[]): MiddlewareHandler<AppEnv> {
+  return async (c, next) => {
+    if (!roles.includes(c.get('role'))) return c.json({ error: 'Accès réservé' }, 403);
     await next();
   };
 }

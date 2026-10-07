@@ -390,7 +390,8 @@ export const orderEvent = pgTable(
 
 /**
  * empty: no signal that day, no model call. signals_only: AI off or no API key, the screen shows
- * the raw signals. pending → submitted (in a Batch API job) → ready, or failed after the morning retry.
+ * the fixed-sentence brief (briefFromRules). pending → submitted (in a Batch API job) → ready, or
+ * failed after the morning retry.
  */
 export const aiBriefStatus = pgEnum('ai_brief_status', [
   'empty',
@@ -433,4 +434,35 @@ export const aiBrief = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [uniqueIndex().on(t.organizationId, t.briefDate), index().on(t.status, t.briefDate)],
+);
+
+/** Who wrote what the merchant read: Claude, or the fixed sentences used without the model. */
+export const aiBriefSource = pgEnum('ai_brief_source', ['ai', 'rules']);
+
+/** done: the merchant did it. not_relevant: the signal did not apply to their shop. */
+export const aiBriefVerdict = pgEnum('ai_brief_verdict', ['done', 'not_relevant']);
+
+/**
+ * The merchant's answer to one signal of a brief, to measure during the beta which signals
+ * lead to action. One row per brief and signal: the last answer wins, removing it deletes the row.
+ */
+export const aiBriefFeedback = pgTable(
+  'ai_brief_feedback',
+  {
+    id: id(),
+    organizationId: orgRef(),
+    briefId: uuid()
+      .notNull()
+      .references(() => aiBrief.id, { onDelete: 'cascade' }),
+    /** Signal reference within the brief (s1, s2…). */
+    signalRef: text().notNull(),
+    /** Signal code (C1…R1), for statistics without opening the brief. */
+    code: text().notNull(),
+    verdict: aiBriefVerdict().notNull(),
+    source: aiBriefSource().notNull(),
+    userId: uuid().references(() => user.id, { onDelete: 'set null' }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex().on(t.briefId, t.signalRef), index().on(t.organizationId, t.code)],
 );

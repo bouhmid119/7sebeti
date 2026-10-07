@@ -36,6 +36,20 @@
       "when": 1791330077505,
       "tag": "0004_ai_brief_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791377995996,
+      "tag": "0005_ai_brief_feedback",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791377996932,
+      "tag": "0006_ai_brief_feedback_rls",
+      "breakpoints": true
     }
   ]
 }

@@ -30,10 +30,10 @@ La consigne système (`prompt.ts`) est fixe et mise en cache. Le modèle répond
 ## Statuts de `ai_brief`
 
 - `empty` : aucun signal ce jour-là, pas d'appel au modèle.
-- `signals_only` : IA coupée ou sans clé ; l'écran montre les signaux bruts.
-- `pending`, puis `submitted` : en attente du modèle.
+- `signals_only` : IA coupée ou sans clé ; l'écran montre le brief en phrases fixes.
+- `pending`, puis `submitted` : en attente du modèle ; en attendant, phrases fixes.
 - `ready` : brief validé dans `content`.
-- `failed` : refus, erreur ou réponse hors format après les deux essais ; l'écran montre les signaux bruts.
+- `failed` : refus, erreur ou réponse hors format après les deux essais ; phrases fixes.
 
 La table est sous RLS comme les autres tables métier (migration `0004_ai_brief_rls`). Les jobs ne lisent en multi-organisation que le routage (identifiants, statuts, batch) ; tout le reste passe par `withTenant`.
 
@@ -55,4 +55,25 @@ Le socle ne stocke pas encore certaines données ; les signaux concernés resten
 - pas de transporteur : L2 ne juge que les gouvernorats, déduits du champ ville (`toGovernorate`) ;
 - pas d'objectif de confirmation par produit : le seuil par défaut s'applique.
 
-Aucune route d'API n'expose encore le brief : elle viendra avec l'écran Actions, derrière l'authentification.
+## Sans le modèle : phrases fixes
+
+Quand le texte de Claude manque (pas de clé, IA coupée, réponse pas encore arrivée ou en échec), `briefFromRules` (`packages/domain/src/brief/rules.ts`) rédige le brief avec une phrase par code de signal, à partir des mêmes chiffres formatés que le payload. Rien n'est calculé : les tests vérifient qu'aucun chiffre n'est absent des données. Le commerçant a donc toujours un brief lisible, et la bêta peut démarrer sans clé Anthropic.
+
+`presentBrief` (`view.ts`) choisit ce qui s'affiche : le texte de Claude s'il est `ready`, sinon les phrases fixes, puis les autres signaux du jour (formatés, vrais noms, lien).
+
+## API
+
+Toutes les routes demandent une session et l'en-tête `x-organization-id`, et passent par `withTenant`.
+
+| Route | Rôles | Rend |
+|---|---|---|
+| `GET /api/briefs/today` | owner, admin, viewer | le brief du jour dans le fuseau de l'organisation (`BriefView`), 404 avant le job de 03:00 |
+| `GET /api/briefs/:date` | owner, admin, viewer | le brief d'un jour (AAAA-MM-JJ) |
+| `GET /api/briefs?limit=14` | owner, admin, viewer | l'historique (date, statut, nombre de signaux), 60 au plus |
+| `PUT /api/briefs/:id/signals/:signal/feedback` | owner, admin | enregistre `{ "feedback": "done" \| "not_relevant" \| null }` |
+
+Les agents n'ont pas accès au brief : il juge aussi leurs résultats (C3, C4). La réponse ne contient ni payload, ni pseudonymes, ni avertissements, ni tokens. Schémas : `BriefView`, `BriefHistoryItem`, `BriefFeedbackRequest` dans `@7sebeti/contracts`.
+
+## Retours du commerçant
+
+Sur chaque signal, le commerçant peut dire « fait » (`done`) ou « pas pertinent » (`not_relevant`). Une ligne par brief et par signal dans `ai_brief_feedback` (migrations `0005` et `0006`), avec le code du signal et la source du texte lu (`ai` ou `rules`) : c'est la mesure de la bêta, signal par signal, et entre texte de Claude et phrases fixes. La politique RLS vérifie aussi, à l'écriture, que le brief visé appartient à l'organisation.
