@@ -12,6 +12,8 @@ const Env = z.object({
   ENCRYPTION_KEY: z.string().min(1),
   /** Keyring wrapping each organization's data key (personal data, raw payloads). */
   DATA_MASTER_KEY: z.string().min(1),
+  /** Commit or tag of the running build (set by the image; Render sets RENDER_GIT_COMMIT). */
+  APP_VERSION: z.string().optional(),
   RENDER_GIT_COMMIT: z.string().optional(),
 });
 
