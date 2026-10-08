@@ -1,0 +1,7 @@
+# Cursor : l'agent peut lire un fichier ignoré par git (.gitignore ne bloque que l'indexation).
+# On lui ferme les secrets locaux. Son terminal peut toujours les lire : ne jamais lui demander.
+.env
+.env.*
+!.env.example
+*.age
+*.key

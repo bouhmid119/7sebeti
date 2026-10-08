@@ -23,14 +23,20 @@ Les règles métier vivent dans `packages/domain` (sans I/O), les jobs dans `app
 
 ## Démarrer en local
 
-Prérequis : Node 22+, pnpm (`corepack enable`), PostgreSQL 17 (`docker compose up -d` ou une instance locale).
+Prérequis : Node 22+, pnpm (`corepack enable`), PostgreSQL 17 (`docker compose up -d` ou une instance locale dont l'utilisateur est superutilisateur : la migration `0002_rls` crée le rôle `app_rw`).
 
 ```bash
 pnpm install
-cp .env.example .env          # puis renseigner ENCRYPTION_KEY : openssl rand -base64 32
+cp .env.example .env          # puis renseigner ENCRYPTION_KEY, DATA_MASTER_KEY et BETTER_AUTH_SECRET,
+                              # chacun avec : openssl rand -base64 32
+set -a; . ./.env; set +a      # drizzle-kit et Vitest ne lisent pas .env
 pnpm db:migrate
 pnpm dev                      # web :5173, api :4000, worker
 ```
+
+Sans `DATA_MASTER_KEY` ou `BETTER_AUTH_SECRET`, l'API et le worker s'arrêtent au démarrage alors que le web répond quand même : vérifier `curl localhost:4000/health`. `pnpm test` ne lance les tests RLS et API que si `DATABASE_URL` est exporté dans le shell.
+
+Pour travailler avec Cursor : [docs/cursor.md](docs/cursor.md).
 
 ## Commandes
 
