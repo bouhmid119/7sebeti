@@ -1,0 +1,61 @@
+# Production stack on one VM (Scaleway DEV1-S, Paris). The database is Scaleway's managed
+# PostgreSQL 17, reachable only from this VM. Usage (on the VM, in this folder):
+#   docker compose --env-file .env pull && docker compose --env-file .env up -d
+# A second copy with COMPOSE_PROJECT_NAME=sebeti-staging and its own .env runs staging.
+name: ${COMPOSE_PROJECT_NAME:-sebeti}
+
+x-app: &app
+  image: ghcr.io/bouhmid119/7sebeti:${IMAGE_TAG:-latest}
+  env_file: .env
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options: { max-size: 10m, max-file: '3' }
+
+services:
+  migrate:
+    <<: *app
+    command: migrate
+    restart: 'no'
+
+  api:
+    <<: *app
+    command: api
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    mem_limit: ${API_MEM_LIMIT:-512m}
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://localhost:4000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  worker:
+    <<: *app
+    command: worker
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    mem_limit: ${WORKER_MEM_LIMIT:-512m}
+
+  backup:
+    build: ../backup
+    env_file: .env
+    restart: unless-stopped
+    profiles: [backup]
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports: ['80:80', '443:443', '443:443/udp']
+    environment:
+      API_DOMAIN: ${API_DOMAIN:-api.7sebeti.com}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [api]
+    profiles: [edge]
+
+volumes:
+  caddy_data:
+  caddy_config:

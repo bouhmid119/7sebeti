@@ -1,5 +1,5 @@
 import type { HealthResponse } from '@7sebeti/contracts';
-import { sql } from 'drizzle-orm';
+import { sql } from '@7sebeti/db';
 import { Hono } from 'hono';
 import type { AppDeps } from '../app';
 

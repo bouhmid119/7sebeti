@@ -1,0 +1,5 @@
+# TLS via Let's Encrypt. No access log on purpose: Converty webhook URLs carry a secret.
+{$API_DOMAIN:api.7sebeti.com} {
+	encode zstd gzip
+	reverse_proxy api:4000
+}

@@ -7,6 +7,7 @@ import { sql } from 'drizzle-orm';
 import {
   bigint,
   boolean,
+  date,
   index,
   integer,
   jsonb,
@@ -45,18 +46,94 @@ export const organization = pgTable('organization', {
   timezone: text().notNull().default('Africa/Tunis'),
   /** Modules the merchant is subscribed to (dashboard, funnel, cashflow…). */
   enabledModules: text().array().notNull().default(sql`'{}'::text[]`),
+  /** Per-organization data key (AES-256), wrapped with DATA_MASTER_KEY. Deleting it crypto-shreds the org. */
+  dataKeyEncrypted: text().notNull(),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
 
+// Auth tables follow the Better Auth model (user, session, account, verification, two_factor).
+// They are not organization-scoped and stay outside row-level security.
+
 export const user = pgTable('user', {
   id: id(),
   email: text().notNull().unique(),
-  name: text(),
+  name: text().notNull().default(''),
+  emailVerified: boolean().notNull().default(false),
+  image: text(),
+  twoFactorEnabled: boolean().notNull().default(false),
   isPlatformAdmin: boolean().notNull().default(false),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
+
+const userRef = () =>
+  uuid()
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' });
+
+export const session = pgTable(
+  'session',
+  {
+    id: id(),
+    userId: userRef(),
+    token: text().notNull().unique(),
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
+    ipAddress: text(),
+    userAgent: text(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index().on(t.userId)],
+);
+
+export const account = pgTable(
+  'account',
+  {
+    id: id(),
+    userId: userRef(),
+    accountId: text().notNull(),
+    providerId: text().notNull(),
+    accessToken: text(),
+    refreshToken: text(),
+    idToken: text(),
+    accessTokenExpiresAt: timestamp({ withTimezone: true }),
+    refreshTokenExpiresAt: timestamp({ withTimezone: true }),
+    scope: text(),
+    /** Password hash for the email/password provider. */
+    password: text(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index().on(t.userId)],
+);
+
+export const verification = pgTable(
+  'verification',
+  {
+    id: id(),
+    identifier: text().notNull(),
+    value: text().notNull(),
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index().on(t.identifier)],
+);
+
+export const twoFactor = pgTable(
+  'two_factor',
+  {
+    id: id(),
+    userId: userRef(),
+    secret: text().notNull(),
+    backupCodes: text().notNull(),
+    verified: boolean().notNull().default(true),
+    failedVerificationCount: integer().notNull().default(0),
+    lockedUntil: timestamp({ withTimezone: true }),
+  },
+  (t) => [index().on(t.userId), index().on(t.secret)],
+);
 
 export const membership = pgTable(
   'membership',
@@ -120,14 +197,40 @@ export const inboundEvent = pgTable(
     provider: integrationProvider().notNull(),
     eventType: text().notNull(),
     externalId: text(),
-    payload: jsonb().notNull(),
+    /** SHA-256 of the canonical JSON payload. */
+    payloadHash: text().notNull(),
+    /** Payload gzip-compressed then encrypted with the organization data key. */
+    payloadEncrypted: text().notNull(),
     status: inboundEventStatus().notNull().default('received'),
     attempts: integer().notNull().default(0),
     error: text(),
     receivedAt: createdAt(),
     processedAt: timestamp({ withTimezone: true }),
   },
-  (t) => [index().on(t.organizationId, t.receivedAt), index().on(t.status)],
+  (t) => [
+    index().on(t.organizationId, t.receivedAt),
+    index('inbound_event_pending_idx').on(t.receivedAt).where(sql`status <> 'processed'`),
+  ],
+);
+
+/**
+ * Last known fingerprint of each external object (order, shipment…). A webhook whose
+ * canonical payload hash matches costs no write, no job and no recompute; only the
+ * counter moves. Kept 13 months as the idempotency trail.
+ */
+export const externalObjectState = pgTable(
+  'external_object_state',
+  {
+    organizationId: orgRef(),
+    provider: integrationProvider().notNull(),
+    objectType: text().notNull(),
+    externalId: text().notNull(),
+    payloadHash: text().notNull(),
+    duplicateCount: integer().notNull().default(0),
+    firstSeenAt: createdAt(),
+    lastSeenAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.organizationId, t.provider, t.objectType, t.externalId] })],
 );
 
 // ─── Catalog ────────────────────────────────────────────────────────────────
@@ -223,8 +326,11 @@ export const order = pgTable(
     connectionId: uuid().references(() => integrationConnection.id, { onDelete: 'set null' }),
     provider: integrationProvider().notNull(),
     externalId: text().notNull(),
-    customerName: text(),
-    customerPhone: text(),
+    /** Customer name encrypted with the organization data key. */
+    customerNameEncrypted: text(),
+    /** HMAC of the normalized phone with an organization-derived key: matches repeat customers without storing the number. */
+    customerPhoneHash: text(),
+    customerPhoneLast3: text(),
     city: text(),
     sourceStatus: text().notNull(),
     category: orderStatusCategory(),
@@ -241,7 +347,7 @@ export const order = pgTable(
   (t) => [
     uniqueIndex().on(t.organizationId, t.provider, t.externalId),
     index().on(t.organizationId, t.sourceCreatedAt),
-    index().on(t.organizationId, t.customerPhone),
+    index().on(t.organizationId, t.customerPhoneHash),
   ],
 );
 
@@ -278,4 +384,88 @@ export const orderEvent = pgTable(
     occurredAt: timestamp({ withTimezone: true }).notNull(),
   },
   (t) => [uniqueIndex().on(t.orderId, t.occurredAt, t.sourceStatus)],
+);
+
+// ─── AI brief ───────────────────────────────────────────────────────────────
+
+/**
+ * empty: no signal that day, no model call. signals_only: AI off or no API key, the screen shows
+ * the fixed-sentence brief (briefFromRules). pending → submitted (in a Batch API job) → ready, or
+ * failed after the morning retry.
+ */
+export const aiBriefStatus = pgEnum('ai_brief_status', [
+  'empty',
+  'signals_only',
+  'pending',
+  'submitted',
+  'ready',
+  'failed',
+]);
+
+/** Daily « Actions à prendre » brief: signals computed by code, wording by Claude. One row per org and day. */
+export const aiBrief = pgTable(
+  'ai_brief',
+  {
+    id: id(),
+    organizationId: orgRef(),
+    /** Day of the brief in the organization's timezone. */
+    briefDate: date({ mode: 'string' }).notNull(),
+    status: aiBriefStatus().notNull(),
+    /** Full signals (real agent names, links): what the screen shows when the AI text is missing. */
+    signals: jsonb().notNull(),
+    /** What is sent to the model: whitelisted, pseudonymised, formatted. Null when nothing is sent. */
+    payload: jsonb(),
+    /** Pseudonym → real agent name, to restore names in the answer. Never sent to the model. */
+    pseudonyms: jsonb(),
+    /** Validated brief with real names restored (BriefContent in @7sebeti/domain). */
+    content: jsonb(),
+    model: text(),
+    batchId: text(),
+    attempts: integer().notNull().default(0),
+    /** Usage of the answer that was kept, for cost tracking (uncached input, output, cache reads and writes). */
+    inputTokens: integer(),
+    outputTokens: integer(),
+    cacheReadTokens: integer(),
+    cacheWriteTokens: integer(),
+    /** Non-blocking checks on the answer (figure not found in the data, unknown pseudonym…). */
+    warnings: text().array().notNull().default(sql`'{}'::text[]`),
+    error: text(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex().on(t.organizationId, t.briefDate), index().on(t.status, t.briefDate)],
+);
+
+/**
+ * What the merchant had in front of them when answering on a signal: Claude's text, a fixed
+ * sentence (no model), or just the signal card (a signal without a written action).
+ */
+export const aiBriefShownAs = pgEnum('ai_brief_shown_as', ['ai', 'rules', 'signal']);
+
+/** done: the merchant did it. not_relevant: the signal did not apply to their shop. */
+export const aiBriefVerdict = pgEnum('ai_brief_verdict', ['done', 'not_relevant']);
+
+/**
+ * The merchant's answer to one signal of a brief, to measure during the beta which signals
+ * lead to action. One row per brief and signal: the last answer wins, removing it deletes the row.
+ */
+export const aiBriefFeedback = pgTable(
+  'ai_brief_feedback',
+  {
+    id: id(),
+    organizationId: orgRef(),
+    briefId: uuid()
+      .notNull()
+      .references(() => aiBrief.id, { onDelete: 'cascade' }),
+    /** Signal reference within the brief (s1, s2…). */
+    signalRef: text().notNull(),
+    /** Signal code (C1…R1), for statistics without opening the brief. */
+    code: text().notNull(),
+    verdict: aiBriefVerdict().notNull(),
+    shownAs: aiBriefShownAs().notNull(),
+    userId: uuid().references(() => user.id, { onDelete: 'set null' }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex().on(t.briefId, t.signalRef), index().on(t.organizationId, t.code)],
 );

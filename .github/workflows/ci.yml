@@ -34,11 +34,42 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck
-      - run: pnpm test
-      - run: pnpm build
       - name: Migrations apply on a fresh database
         run: pnpm db:migrate
+      - name: Tests (unit + RLS + API against Postgres)
+        run: pnpm test
+      - run: pnpm build
       - name: Schema and migrations are in sync
         run: |
           pnpm db:generate
           git diff --exit-code -- packages/db/migrations
+
+  image:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: sebeti
+          POSTGRES_PASSWORD: sebeti
+          POSTGRES_DB: sebeti
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U sebeti" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the app image
+        run: docker build --build-arg APP_VERSION=${{ github.sha }} -t sebeti:ci .
+      - name: Build the backup image
+        run: docker build -t sebeti-backup:ci ops/backup
+      - name: Smoke test (migrate, then api /health)
+        run: |
+          ENV="-e DATABASE_URL=postgres://sebeti:sebeti@localhost:5432/sebeti
+               -e BETTER_AUTH_SECRET=$(openssl rand -base64 32)
+               -e ENCRYPTION_KEY=v1:$(openssl rand -base64 32)
+               -e DATA_MASTER_KEY=v1:$(openssl rand -base64 32)
+               -e API_URL=http://localhost:4000"
+          docker run --rm --network host $ENV sebeti:ci migrate
+          docker run -d --name api --network host $ENV sebeti:ci api
+          for i in $(seq 1 20); do curl -fsS localhost:4000/health && exit 0; sleep 1; done
+          docker logs api; exit 1

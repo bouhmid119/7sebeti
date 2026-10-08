@@ -17,7 +17,6 @@
     "@7sebeti/db": "workspace:*",
     "@7sebeti/domain": "workspace:*",
     "@7sebeti/integrations": "workspace:*",
-    "drizzle-orm": "^0.45.3",
     "pg-boss": "^12.36.0",
     "zod": "^3.25.76"
   }
