@@ -20,4 +20,8 @@ export type WebhookAck = z.infer<typeof WebhookAck>;
 /** pg-boss queue names shared by apps/api (producer) and apps/worker (consumer). */
 export const QUEUES = {
   inboundEvent: 'inbound-event',
+  /** Nightly AI brief: compute signals and send the batch, store results, morning retry. */
+  aiBriefPrepare: 'ai-brief-prepare',
+  aiBriefCollect: 'ai-brief-collect',
+  aiBriefFallback: 'ai-brief-fallback',
 } as const;

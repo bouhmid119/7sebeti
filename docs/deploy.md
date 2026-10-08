@@ -46,6 +46,8 @@ cp .env.example .env && chmod 600 .env   # puis remplir
 
 Si le repo devient privé : `docker login ghcr.io` avec un jeton GitHub en lecture des packages.
 
+Brief IA de nuit : renseigner `ANTHROPIC_API_KEY` dans `.env` ; seul le worker s'en sert (sans elle, le brief garde les signaux bruts). `AI_BRIEF_MODEL` change de modèle sans toucher au code, `AI_BRIEF_ENABLED=false` coupe l'IA. En staging, laisser la clé vide. Détails : `docs/brief-ia.md`.
+
 ## Déployer, revenir en arrière
 
 ```bash
