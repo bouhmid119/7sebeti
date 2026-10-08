@@ -7,7 +7,8 @@ Production : **Scaleway, région Paris** (décision d'Ahmed, octobre 2026). Repl
 | `apps/web` | Cloudflare Pages | `app.7sebeti.com` |
 | `api`, `worker`, Caddy, sauvegarde | Scaleway Instance DEV1-S, Paris (Docker Compose, `ops/deploy/`) | `api.7sebeti.com` |
 | PostgreSQL 17 | Scaleway Managed Database DB-DEV-S, Paris, accessible depuis la VM seulement | — |
-| Sauvegardes | Cloudflare R2, juridiction UE, dumps chiffrés `age` | — |
+| Sauvegardes | OVH Object Storage, France (API S3, verrouillage des objets), dumps chiffrés `age` | — |
+| E-mails transactionnels | Resend, domaine en région `eu-west-1` | `7sebeti.com` |
 | Image | GitHub Container Registry, `ghcr.io/bouhmid119/7sebeti` | — |
 | DNS | Cloudflare (`7sebeti.com`) | — |
 
@@ -24,10 +25,11 @@ Rien de payant n'est créé par le code : ces étapes se font dans les consoles.
    - Managed Database PostgreSQL 17, DB-DEV-S, attachée au Private Network, sans endpoint public ; sauvegardes automatiques activées. Créer la base `sebeti` et un utilisateur dédié.
    - Instance DEV1-S (Debian 12 ou Ubuntu 24.04), attachée au Private Network, IP publique, clé SSH.
    - Security group de l'instance : entrée refusée par défaut, ouvrir 22 (SSH), 80 et 443.
-2. **Cloudflare R2** : bucket `sebeti-backups` en juridiction UE ; règles de cycle de vie `daily/` 7 jours, `weekly/` 28 jours ; un jeton API limité à ce bucket.
-3. **Clé de sauvegarde** sur un poste de confiance : `age-keygen -o sebeti-backup.key`. La clé publique (`age1…`) va dans `.env` ; le fichier privé reste hors ligne (gestionnaire de mots de passe, copie chez Dali).
-4. **DNS** chez Cloudflare : `api` → enregistrement A vers l'IP de la VM, **proxy désactivé** (nuage gris) tant que l'avis juridique sur le proxy n'est pas rendu.
-5. **Heartbeats** (Better Stack, gratuit) : un pour la sauvegarde de nuit.
+2. **OVH Object Storage** (Public Cloud, région en France, par exemple `eu-west-par`) : bucket `sebeti-backups` créé **avec verrouillage des objets**, rétention par défaut 7 jours en mode conformité ; règles de cycle de vie `daily/` 8 jours, `weekly/` 29 jours ; un utilisateur S3 limité à ce bucket. Reporter `S3_ENDPOINT` et `S3_REGION` dans `.env`.
+3. **Resend** : créer le domaine `7sebeti.com` en région **eu-west-1** (choix définitif), ajouter chez Cloudflare les enregistrements SPF, DKIM et DMARC fournis, en « DNS only » ; créer une clé API limitée à l'envoi et la mettre dans `RESEND_API_KEY`. Les e-mails ne contiennent qu'un lien : jamais de nom ni de téléphone de client.
+4. **Clé de sauvegarde** sur un poste de confiance : `age-keygen -o sebeti-backup.key`. La clé publique (`age1…`) va dans `.env` ; le fichier privé reste hors ligne (gestionnaire de mots de passe, copie chez Dali).
+5. **DNS** chez Cloudflare : `api` → enregistrement A vers l'IP de la VM, **proxy désactivé** (nuage gris) tant que l'avis juridique sur le proxy n'est pas rendu.
+6. **Heartbeats** (Better Stack, gratuit) : un pour la sauvegarde de nuit.
 
 ## Préparer la VM
 
@@ -72,4 +74,4 @@ Second projet Compose sur la même VM (`COMPOSE_PROJECT_NAME=sebeti-staging`, sa
 
 ## Repli sur Render
 
-`render.yaml` décrit la même pile en Docker à Francfort (`entrypoint migrate` avant chaque déploiement). Les sauvegardes R2 restent valables : restaurer le dernier dump dans la base Render (`ops/backup/restore-check.sh`), puis basculer le DNS `api`.
+`render.yaml` décrit la même pile en Docker à Francfort (`entrypoint migrate` avant chaque déploiement). Les sauvegardes OVH restent valables : restaurer le dernier dump dans la base Render (`ops/backup/restore-check.sh`), puis basculer le DNS `api`.

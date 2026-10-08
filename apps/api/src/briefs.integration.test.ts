@@ -61,6 +61,7 @@ describe.skipIf(!url)('brief API', () => {
       apiUrl: 'http://localhost:4000',
       appUrl: APP_URL,
       production: false,
+      sendEmail: async () => {},
     }),
     dataKeyFor: createDataKeyCache(db, dataMasterKeyring),
     dataMasterKeyring,

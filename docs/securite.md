@@ -1,12 +1,12 @@
 # Sécurité des données
 
-Ce document décrit ce qui est en place dans le code. Hébergement : Scaleway Paris (`docs/deploy.md`). Le proxy Cloudflare et le fournisseur d'e-mail restent à trancher (page Notion « Design d'architecture », section 1).
+Ce document décrit ce qui est en place dans le code. Hébergement : Scaleway Paris (`docs/deploy.md`). Proxy Cloudflare désactivé devant l'API, e-mails par Resend, sauvegardes chez OVH (décisions du 8 octobre 2026, page Notion « Design d'architecture », section 1).
 
 ## Authentification
 
 - Better Auth, e-mail et mot de passe (10 caractères minimum), sessions en cookie `httpOnly`, `SameSite=Lax`, `Secure` en production. `app.7sebeti.com` et `api.7sebeti.com` sont le même site, donc le cookie suit les appels du front.
 - Double authentification TOTP disponible (`/api/auth/two-factor/*`). La rendre obligatoire pour les propriétaires est la prochaine étape.
-- La vérification d'e-mail et la réinitialisation de mot de passe attendent le choix du fournisseur d'e-mail.
+- Vérification de l'adresse à l'inscription et mot de passe oublié par e-mail (Resend, `apps/api/src/lib/mailer.ts`). Resend garde ses données aux États-Unis : un e-mail ne contient que l'adresse du marchand et un lien, jamais une donnée de client. Sans `RESEND_API_KEY` (dev, CI), l'e-mail n'est pas envoyé et seul son sujet est journalisé ; la clé est obligatoire en production.
 - Routes : `/api/auth/*` (Better Auth), `GET /api/me`, `POST /api/organizations`, et toute route métier exige l'en-tête `x-organization-id` d'une organisation dont l'utilisateur est membre.
 
 ## Isolation entre marchands (RLS)
@@ -44,7 +44,7 @@ Ce document décrit ce qui est en place dans le code. Hébergement : Scaleway Pa
 
 Scripts dans `ops/backup/`. En production, le service `backup` du compose (`ops/deploy/compose.yml`) lance `backup.sh` chaque nuit à 02:30 UTC :
 
-- `backup.sh`, chaque nuit : `pg_dump` compressé, chiffré avec la clé publique `age`, envoyé dans Cloudflare R2 en juridiction UE. Le dump du dimanche va dans `weekly/`. Règles de cycle de vie R2 : `daily/` 7 jours, `weekly/` 28 jours.
+- `backup.sh`, chaque nuit : `pg_dump` compressé, chiffré avec la clé publique `age`, envoyé dans OVH Object Storage en France, dans un bucket à verrouillage d'objets (un dump ne peut pas être supprimé ni modifié pendant sa rétention, même avec nos identifiants). Le dump du dimanche va dans `weekly/`. Règles de cycle de vie : `daily/` 8 jours, `weekly/` 29 jours.
 - `restore-check.sh`, chaque mois : restaure le dernier dump sur une base jetable **dans la même région UE** (jamais sur un runner GitHub), puis compare les comptages avec la production (`compare-counts.sh`). Une sauvegarde jamais restaurée ne compte pas.
 - La clé privée `age` reste hors ligne, chez Ahmed et Dali.
 

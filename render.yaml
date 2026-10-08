@@ -30,6 +30,8 @@ services:
         sync: false
       - key: DATA_MASTER_KEY
         sync: false
+      - key: RESEND_API_KEY
+        sync: false
 
   - type: worker
     name: sebeti-worker

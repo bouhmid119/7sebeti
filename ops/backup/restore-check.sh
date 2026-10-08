@@ -6,21 +6,23 @@
 #   SOURCE_DATABASE_URL    production database (read-only user is enough) for the comparison
 #   RESTORE_DATABASE_URL   empty scratch database to restore into
 #   BACKUP_AGE_IDENTITY    path to the age private key file (kept offline otherwise)
-#   R2_BUCKET, R2_ENDPOINT, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY (read access)
+#   S3_BUCKET, S3_ENDPOINT, S3_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY (read access)
 # Optional:
 #   BACKUP_KEY             object key to restore (default: latest daily/)
 #   HEARTBEAT_URL          pinged when the comparison passes
 set -euo pipefail
 
-: "${SOURCE_DATABASE_URL:?}" "${RESTORE_DATABASE_URL:?}" "${BACKUP_AGE_IDENTITY:?}" "${R2_BUCKET:?}" "${R2_ENDPOINT:?}"
+: "${SOURCE_DATABASE_URL:?}" "${RESTORE_DATABASE_URL:?}" "${BACKUP_AGE_IDENTITY:?}" "${S3_BUCKET:?}" "${S3_ENDPOINT:?}" "${S3_REGION:?}"
+export AWS_REQUEST_CHECKSUM_CALCULATION=when_required AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
+export AWS_DEFAULT_REGION="$S3_REGION"
 
-key="${BACKUP_KEY:-$(aws s3 ls "s3://${R2_BUCKET}/daily/" --endpoint-url "$R2_ENDPOINT" | sort | tail -1 | awk '{print "daily/"$4}')}"
+key="${BACKUP_KEY:-$(aws s3 ls "s3://${S3_BUCKET}/daily/" --endpoint-url "$S3_ENDPOINT" | sort | tail -1 | awk '{print "daily/"$4}')}"
 echo "restoring ${key}"
 
 # Policies reference the app_rw role, which pg_dump does not carry.
 psql "$RESTORE_DATABASE_URL" -qX -c "do \$\$ begin if not exists (select 1 from pg_roles where rolname = 'app_rw') then create role app_rw nologin; end if; end \$\$;"
 
-aws s3 cp "s3://${R2_BUCKET}/${key}" - --endpoint-url "$R2_ENDPOINT" --only-show-errors \
+aws s3 cp "s3://${S3_BUCKET}/${key}" - --endpoint-url "$S3_ENDPOINT" --only-show-errors \
   | age --decrypt --identity "$BACKUP_AGE_IDENTITY" \
   | pg_restore --no-owner --no-privileges --exit-on-error --dbname "$RESTORE_DATABASE_URL"
 

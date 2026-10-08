@@ -114,7 +114,8 @@ Chaque source implémente une interface commune dans `packages/integrations` :
 | API, worker, Caddy (TLS), sauvegarde de nuit | Instance DEV1-S, Docker Compose (`ops/deploy/`) |
 | PostgreSQL 17 | Managed Database DB-DEV-S, réseau privé uniquement |
 | Front | Cloudflare Pages, gratuit |
-| Sauvegardes hors région | Cloudflare R2 juridiction UE, chiffrées avec une clé que R2 ne détient pas |
+| Sauvegardes hors région | OVH Object Storage France, verrouillage des objets, chiffrées avec une clé qu'OVH ne détient pas |
+| E-mails transactionnels | Resend (région eu-west-1), sans donnée de client |
 | Image | GitHub Container Registry |
 
 Une seule image Docker sert l'API, le worker et les migrations, ce qui garde **Render Francfort** comme repli sans changer de code (`render.yaml`). Détails et procédure : `docs/deploy.md`.
