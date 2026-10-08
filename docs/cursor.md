@@ -30,7 +30,7 @@ Ne pas ouvrir `~/Documents/7sebeti/v2` : c'est le dossier de la session Claude d
 cd ~/Documents/7sebeti
 git clone https://github.com/bouhmid119/7sebeti.git v2-cursor
 cd v2-cursor
-git checkout ia-actions   # main n'a que le commit initial tant que les PR ne sont pas fusionnées
+git checkout outils-cursor   # contient toutes les PR en cours ; main n'a que le commit initial tant qu'elles ne sont pas fusionnées
 ```
 
 Puis File > Open Folder > `v2-cursor`. Pour lire la v1 à côté : File > Add Folder to Workspace > `v1-hsebeti` (lecture seulement).
