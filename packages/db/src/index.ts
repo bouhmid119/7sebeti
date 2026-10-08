@@ -27,7 +27,16 @@ export function rawExecutor(tx: Tx): ExecuteSql {
 }
 
 /** Tables deliberately outside row-level security (auth is per user, not per organization). */
-export const RLS_EXEMPT_TABLES = ['user', 'session', 'account', 'verification', 'two_factor'] as const;
+export const RLS_EXEMPT_TABLES = [
+  'identity.user',
+  'identity.session',
+  'identity.account',
+  'identity.verification',
+  'identity.two_factor',
+] as const;
+
+/** One Postgres schema per module (see packages/modules). */
+export const MODULE_SCHEMAS = ['identity', 'connectors', 'catalog', 'orders', 'assistant'];
 
 /**
  * Run `fn` as the restricted `app_rw` role with `app.org_id` set for this transaction only.

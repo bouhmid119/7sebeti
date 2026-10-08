@@ -309,7 +309,9 @@ describe.skipIf(!url)('brief API', () => {
       }),
     );
     await expect(attempt).rejects.toThrow();
-    const leaked = await db.execute(sql`select 1 from ai_brief_feedback where brief_id = ${otherBriefId}`);
+    const leaked = await db.execute(
+      sql`select 1 from assistant.ai_brief_feedback where brief_id = ${otherBriefId}`,
+    );
     expect(leaked).toHaveLength(0);
   });
 });

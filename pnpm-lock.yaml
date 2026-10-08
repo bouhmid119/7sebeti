@@ -140,6 +140,9 @@ importers:
 
   packages/db:
     dependencies:
+      '@7sebeti/modules':
+        specifier: workspace:*
+        version: link:../modules
       drizzle-orm:
         specifier: ^0.45.3
         version: 0.45.3(@opentelemetry/api@1.9.1)(kysely@0.29.6)(pg@8.23.1)(postgres@3.4.9)
@@ -168,6 +171,16 @@ importers:
       zod:
         specifier: ^3.25.76
         version: 3.25.76
+    devDependencies:
+      '@7sebeti/config':
+        specifier: workspace:*
+        version: link:../config
+
+  packages/modules:
+    dependencies:
+      drizzle-orm:
+        specifier: ^0.45.3
+        version: 0.45.3(@opentelemetry/api@1.9.1)(kysely@0.29.6)(pg@8.23.1)(postgres@3.4.9)
     devDependencies:
       '@7sebeti/config':
         specifier: workspace:*

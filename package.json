@@ -10,10 +10,11 @@
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "lint": "biome check .",
+    "lint": "biome check . && node packages/modules/check-boundaries.mjs",
     "format": "biome check --write .",
     "db:generate": "pnpm --filter @7sebeti/db generate",
-    "db:migrate": "pnpm --filter @7sebeti/db migrate"
+    "db:migrate": "pnpm --filter @7sebeti/db migrate",
+    "check-boundaries": "node packages/modules/check-boundaries.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",

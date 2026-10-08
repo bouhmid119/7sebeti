@@ -1,0 +1,26 @@
+{
+  "name": "@7sebeti/modules",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./identity": "./identity/public.ts",
+    "./connectors": "./connectors/public.ts",
+    "./catalog": "./catalog/public.ts",
+    "./orders": "./orders/public.ts",
+    "./assistant": "./assistant/public.ts",
+    "./identity/schema": "./identity/schema.ts",
+    "./connectors/schema": "./connectors/schema.ts",
+    "./catalog/schema": "./catalog/schema.ts",
+    "./orders/schema": "./orders/schema.ts",
+    "./assistant/schema": "./assistant/schema.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.3"
+  },
+  "devDependencies": {
+    "@7sebeti/config": "workspace:*"
+  }
+}
