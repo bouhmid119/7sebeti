@@ -1,0 +1,24 @@
+{
+  "name": "@7sebeti/worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=../../.env src/main.ts",
+    "build": "tsup",
+    "start": "node dist/main.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "devDependencies": {
+    "@7sebeti/config": "workspace:*"
+  },
+  "dependencies": {
+    "@7sebeti/contracts": "workspace:*",
+    "@7sebeti/db": "workspace:*",
+    "@7sebeti/domain": "workspace:*",
+    "@7sebeti/integrations": "workspace:*",
+    "drizzle-orm": "^0.45.3",
+    "pg-boss": "^12.36.0",
+    "zod": "^3.25.76"
+  }
+}

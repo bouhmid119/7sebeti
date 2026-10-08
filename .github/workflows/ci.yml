@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: sebeti
+          POSTGRES_PASSWORD: sebeti
+          POSTGRES_DB: sebeti
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U sebeti" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://sebeti:sebeti@localhost:5432/sebeti
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - name: Migrations apply on a fresh database
+        run: pnpm db:migrate
+      - name: Schema and migrations are in sync
+        run: |
+          pnpm db:generate
+          git diff --exit-code -- packages/db/migrations
