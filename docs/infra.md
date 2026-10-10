@@ -47,7 +47,7 @@ terraform apply
 terraform output ssh                            # la commande SSH de la VM
 ```
 
-Ce que ça crée en France Central : le groupe `sebeti-beta`, le réseau `sebeti-vnet` (sous-réseaux `vm` et `db`), PostgreSQL 17 Flexible Server B1ms 32 Go en accès privé avec la base `sebeti`, la VM B2ats v2 Ubuntu 24.04 (Docker, swap, pare-feu, mises à jour automatiques, dépôt cloné), son IP publique statique, un pare-feu réseau (SSH depuis ton IP seulement, 80 et 443), et un budget avec alertes à 80 % et 100 %.
+Ce que ça crée en France Central : le groupe `hsebeti-beta`, le réseau `hsebeti-vnet` (sous-réseaux `vm` et `db`), PostgreSQL 17 Flexible Server B1ms 32 Go en accès privé avec la base `hsebeti`, la VM B2ats v2 Ubuntu 24.04 (Docker, swap, pare-feu, mises à jour automatiques, dépôt cloné), son IP publique statique, un pare-feu réseau (SSH depuis ton IP seulement, 80 et 443), et un budget avec alertes à 80 % et 100 %.
 
 **Avant le premier `apply`** : vérifier dans le portail que l'abonnement est bien éligible à l'offre gratuite (B2ats v2 et B1ms à 750 h/mois) et passer le compte en paiement à l'utilisation dans les 30 jours.
 
@@ -66,7 +66,7 @@ Les secrets ne passent jamais par Terraform vers la VM : tu les colles toi-même
 
 ```bash
 terraform -chdir=../azure output -raw database_url   # → DATABASE_URL, puis gestionnaire de mots de passe
-ssh sebeti@<IP>
+ssh hsebeti@<IP>
 cd ~/7sebeti/ops/deploy && cp .env.example .env && chmod 600 .env && nano .env
 ```
 

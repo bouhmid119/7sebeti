@@ -1,14 +1,14 @@
 # FALLBACK only — the beta runs on Azure France Central, then Scaleway Paris (docs/deploy.md).
 # Render Blueprint using the same Docker image: API + worker + Postgres in Frankfurt.
 databases:
-  - name: sebeti-db
+  - name: hsebeti-db
     plan: basic-256mb
     region: frankfurt
     postgresMajorVersion: '17'
 
 services:
   - type: web
-    name: sebeti-api
+    name: hsebeti-api
     runtime: docker
     dockerfilePath: ./Dockerfile
     dockerCommand: entrypoint api
@@ -19,7 +19,7 @@ services:
     domains: [api.7sebeti.com]
     envVars:
       - key: DATABASE_URL
-        fromDatabase: { name: sebeti-db, property: connectionString }
+        fromDatabase: { name: hsebeti-db, property: connectionString }
       - key: APP_URL
         value: https://app.7sebeti.com
       - key: API_URL
@@ -34,7 +34,7 @@ services:
         sync: false
 
   - type: worker
-    name: sebeti-worker
+    name: hsebeti-worker
     runtime: docker
     dockerfilePath: ./Dockerfile
     dockerCommand: entrypoint worker
@@ -42,7 +42,7 @@ services:
     region: frankfurt
     envVars:
       - key: DATABASE_URL
-        fromDatabase: { name: sebeti-db, property: connectionString }
+        fromDatabase: { name: hsebeti-db, property: connectionString }
       - key: DATA_MASTER_KEY
         sync: false
       - key: ANTHROPIC_API_KEY

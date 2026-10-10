@@ -32,14 +32,14 @@ resource "random_string" "suffix" {
 }
 
 resource "azurerm_resource_group" "tfstate" {
-  name     = "sebeti-tfstate"
+  name     = "hsebeti-tfstate"
   location = var.location
 }
 
 # The state contains the database password: private container, Entra ID auth only,
 # no shared keys, TLS 1.2, versioning so a bad apply can be rolled back.
 resource "azurerm_storage_account" "tfstate" {
-  name                            = "sebetitfstate${random_string.suffix.result}"
+  name                            = "hsebetitfstate${random_string.suffix.result}"
   resource_group_name             = azurerm_resource_group.tfstate.name
   location                        = azurerm_resource_group.tfstate.location
   account_tier                    = "Standard"

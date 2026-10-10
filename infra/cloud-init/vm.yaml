@@ -13,7 +13,7 @@ packages:
   - unattended-upgrades
 
 write_files:
-  - path: /etc/ssh/sshd_config.d/10-sebeti.conf
+  - path: /etc/ssh/sshd_config.d/10-hsebeti.conf
     content: |
       PasswordAuthentication no
       KbdInteractiveAuthentication no

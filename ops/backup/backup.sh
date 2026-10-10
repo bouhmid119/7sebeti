@@ -27,7 +27,7 @@ export AWS_DEFAULT_REGION="$S3_REGION"
 stamp=$(date -u +%Y-%m-%dT%H%M%SZ)
 prefix=daily
 [ "$(date -u +%u)" = "7" ] && prefix=weekly   # Sunday's dump is kept 4 weeks
-key="${prefix}/sebeti-${stamp}.dump.age"
+key="${prefix}/hsebeti-${stamp}.dump.age"
 
 # -Fc is already compressed; encryption comes after compression.
 pg_dump --format=custom --no-owner --no-privileges "$DATABASE_URL" \
