@@ -51,7 +51,7 @@ export function createAuth({ db, secret, apiUrl, appUrl, production, sendEmail }
     telemetry: { enabled: false },
     advanced: {
       database: { generateId: 'uuid' },
-      cookiePrefix: 'sebeti',
+      cookiePrefix: 'hsebeti',
       useSecureCookies: production,
       defaultCookieAttributes: { httpOnly: true, sameSite: 'lax', secure: production },
     },

@@ -26,17 +26,17 @@ Une seule image (`Dockerfile`), trois rôles : `api`, `worker`, `migrate`. Les a
 
 Rien de payant n'est créé par le code. Le pas-à-pas avec les écrans est dans le ticket Linear MOH-5 ; en résumé :
 
-1. **Azure**, groupe de ressources `sebeti-beta` en France Central, budget avec alerte :
-   - réseau virtuel `sebeti-vnet` avec deux sous-réseaux (`vm`, `db`) ;
-   - PostgreSQL 17 Flexible Server `sebeti-db`, Burstable B1ms 32 Go, **accès privé** sur le sous-réseau `db`, administrateur `sebeti_admin` (il peut créer des rôles, la migration `0002` en a besoin), base `sebeti` ;
-   - VM `sebeti-vm` B2ats v2, Ubuntu 24.04 x64, clé SSH, sous-réseau `vm`, IP publique statique, entrées 22, 80 et 443 seulement.
-2. **OVHcloud Object Storage** (projet Public Cloud, région Paris) : conteneur S3 `sebeti-backups` créé **avec verrouillage des objets**, rétention par défaut 7 jours en mode conformité ; règles de cycle de vie `daily/` 8 jours, `weekly/` 29 jours ; un utilisateur S3 limité à ce conteneur. Reporter `S3_ENDPOINT` et `S3_REGION` dans `.env`.
+1. **Azure**, groupe de ressources `hsebeti-beta` en France Central, budget avec alerte :
+   - réseau virtuel `hsebeti-vnet` avec deux sous-réseaux (`vm`, `db`) ;
+   - PostgreSQL 17 Flexible Server `hsebeti-db`, Burstable B1ms 32 Go, **accès privé** sur le sous-réseau `db`, administrateur `hsebeti_admin` (il peut créer des rôles, la migration `0002` en a besoin), base `hsebeti` ;
+   - VM `hsebeti-vm` B2ats v2, Ubuntu 24.04 x64, clé SSH, sous-réseau `vm`, IP publique statique, entrées 22, 80 et 443 seulement.
+2. **OVHcloud Object Storage** (projet Public Cloud, région Paris) : conteneur S3 `hsebeti-backups` créé **avec verrouillage des objets**, rétention par défaut 7 jours en mode conformité ; règles de cycle de vie `daily/` 8 jours, `weekly/` 29 jours ; un utilisateur S3 limité à ce conteneur. Reporter `S3_ENDPOINT` et `S3_REGION` dans `.env`.
 3. **Resend** : domaine `7sebeti.com` en région **eu-west-1** (choix définitif), enregistrements SPF, DKIM et DMARC chez Cloudflare en « DNS only », clé API limitée à l'envoi (`RESEND_API_KEY`). Les e-mails ne contiennent qu'un lien : jamais de nom ni de téléphone de client.
-4. **Clé de sauvegarde** sur un poste de confiance : `age-keygen -o sebeti-backup.key`. La clé publique (`age1…`) va dans `.env` ; le fichier privé reste hors ligne (gestionnaire de mots de passe, copie chez Dali).
+4. **Clé de sauvegarde** sur un poste de confiance : `age-keygen -o hsebeti-backup.key`. La clé publique (`age1…`) va dans `.env` ; le fichier privé reste hors ligne (gestionnaire de mots de passe, copie chez Dali).
 5. **DNS** chez Cloudflare : `api` → enregistrement A vers l'IP de la VM, **proxy désactivé**, TTL 5 minutes.
 6. **Heartbeat** Better Stack (gratuit) pour la sauvegarde de nuit.
 
-**Connexion à la base.** Azure impose TLS avec des certificats d'autorités publiques (DigiCert Global Root G2, Microsoft RSA Root CA 2017) : `DATABASE_SSL=verify-full` suffit, sans fichier de CA. `DATABASE_URL` a la forme `postgres://sebeti_admin:…@sebeti-db.postgres.database.azure.com:5432/sebeti`, sans `sslmode`. Pour un fournisseur à CA privée, poser le CA dans `ops/deploy/certs/db-ca.pem` et renseigner `DATABASE_CA_CERT_FILE=/run/secrets/certs/db-ca.pem` et `PGSSLROOTCERT=/run/secrets/certs/db-ca.pem`.
+**Connexion à la base.** Azure impose TLS avec des certificats d'autorités publiques (DigiCert Global Root G2, Microsoft RSA Root CA 2017) : `DATABASE_SSL=verify-full` suffit, sans fichier de CA. `DATABASE_URL` a la forme `postgres://hsebeti_admin:…@hsebeti-db.postgres.database.azure.com:5432/hsebeti`, sans `sslmode`. Pour un fournisseur à CA privée, poser le CA dans `ops/deploy/certs/db-ca.pem` et renseigner `DATABASE_CA_CERT_FILE=/run/secrets/certs/db-ca.pem` et `PGSSLROOTCERT=/run/secrets/certs/db-ca.pem`.
 
 ## Préparer la VM
 
@@ -76,7 +76,7 @@ Les migrations tournent dans le service `migrate` avant l'API et le worker ; si 
 
 Limites du compose : API et worker 256 Mo chacun (tas V8 limité par `NODE_HEAP_MB`, 160 par défaut), Caddy 64 Mo, sauvegarde 128 Mo, plus 1 Go de swap. Si la VM sature (`docker stats`, `free -m`), passer en B1ms (2 Go, hors offre gratuite) avant de toucher aux limites.
 
-Pas de staging pendant la bêta : la VM est trop petite. Il reviendra avec l'étape 1 (second projet Compose, `COMPOSE_PROJECT_NAME=sebeti-staging`, sa propre `.env` et sa propre base).
+Pas de staging pendant la bêta : la VM est trop petite. Il reviendra avec l'étape 1 (second projet Compose, `COMPOSE_PROJECT_NAME=hsebeti-staging`, sa propre `.env` et sa propre base).
 
 ## Migration vers Scaleway (étape 1, ticket MOH-19)
 

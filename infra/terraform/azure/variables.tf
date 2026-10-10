@@ -10,13 +10,13 @@ variable "location" {
 
 variable "name" {
   type        = string
-  default     = "sebeti"
+  default     = "hsebeti"
   description = "Prefix of every resource."
 }
 
 variable "admin_user" {
   type    = string
-  default = "sebeti"
+  default = "hsebeti"
 }
 
 variable "ssh_public_key" {

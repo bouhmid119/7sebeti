@@ -16,14 +16,14 @@ jobs:
       postgres:
         image: postgres:17
         env:
-          POSTGRES_USER: sebeti
-          POSTGRES_PASSWORD: sebeti
-          POSTGRES_DB: sebeti
+          POSTGRES_USER: hsebeti
+          POSTGRES_PASSWORD: hsebeti
+          POSTGRES_DB: hsebeti
         ports: ['5432:5432']
         options: >-
-          --health-cmd "pg_isready -U sebeti" --health-interval 5s --health-timeout 5s --health-retries 10
+          --health-cmd "pg_isready -U hsebeti" --health-interval 5s --health-timeout 5s --health-retries 10
     env:
-      DATABASE_URL: postgres://sebeti:sebeti@localhost:5432/sebeti
+      DATABASE_URL: postgres://hsebeti:hsebeti@localhost:5432/hsebeti
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -50,30 +50,30 @@ jobs:
       postgres:
         image: postgres:17
         env:
-          POSTGRES_USER: sebeti
-          POSTGRES_PASSWORD: sebeti
-          POSTGRES_DB: sebeti
+          POSTGRES_USER: hsebeti
+          POSTGRES_PASSWORD: hsebeti
+          POSTGRES_DB: hsebeti
         ports: ['5432:5432']
         options: >-
-          --health-cmd "pg_isready -U sebeti" --health-interval 5s --health-timeout 5s --health-retries 10
+          --health-cmd "pg_isready -U hsebeti" --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - name: Production compose file is valid
         run: cp ops/deploy/.env.example ops/deploy/.env && docker compose -f ops/deploy/compose.yml config -q
       - name: Build the app image
-        run: docker build --build-arg APP_VERSION=${{ github.sha }} -t sebeti:ci .
+        run: docker build --build-arg APP_VERSION=${{ github.sha }} -t hsebeti:ci .
       - name: Build the backup image
-        run: docker build -t sebeti-backup:ci ops/backup
+        run: docker build -t hsebeti-backup:ci ops/backup
       - name: Smoke test (migrate, then api /health)
         run: |
-          ENV="-e DATABASE_URL=postgres://sebeti:sebeti@localhost:5432/sebeti
+          ENV="-e DATABASE_URL=postgres://hsebeti:hsebeti@localhost:5432/hsebeti
                -e BETTER_AUTH_SECRET=$(openssl rand -base64 32)
                -e ENCRYPTION_KEY=v1:$(openssl rand -base64 32)
                -e DATA_MASTER_KEY=v1:$(openssl rand -base64 32)
                -e API_URL=http://localhost:4000
                -e RESEND_API_KEY=re_ci_smoke_test"
-          docker run --rm --network host $ENV sebeti:ci migrate
-          docker run -d --name api --network host $ENV sebeti:ci api
+          docker run --rm --network host $ENV hsebeti:ci migrate
+          docker run -d --name api --network host $ENV hsebeti:ci api
           for i in $(seq 1 20); do curl -fsS localhost:4000/health && exit 0; sleep 1; done
           docker logs api; exit 1
 

@@ -2,8 +2,8 @@
 # Scaleway Paris (docs/deploy.md). The database is the provider's managed PostgreSQL 17 on
 # the private network. Nothing here is provider-specific. Usage (on the VM, in this folder):
 #   docker compose pull && docker compose up -d
-# A second copy with COMPOSE_PROJECT_NAME=sebeti-staging and its own .env runs staging.
-name: ${COMPOSE_PROJECT_NAME:-sebeti}
+# A second copy with COMPOSE_PROJECT_NAME=hsebeti-staging and its own .env runs staging.
+name: ${COMPOSE_PROJECT_NAME:-hsebeti}
 
 x-app: &app
   image: ghcr.io/bouhmid119/7sebeti:${IMAGE_TAG:-latest}
