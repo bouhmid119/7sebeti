@@ -58,6 +58,8 @@ jobs:
           --health-cmd "pg_isready -U sebeti" --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
+      - name: Production compose file is valid
+        run: cp ops/deploy/.env.example ops/deploy/.env && docker compose -f ops/deploy/compose.yml config -q
       - name: Build the app image
         run: docker build --build-arg APP_VERSION=${{ github.sha }} -t sebeti:ci .
       - name: Build the backup image

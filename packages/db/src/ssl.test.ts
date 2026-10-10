@@ -9,6 +9,10 @@ describe('databaseSsl', () => {
     expect(databaseSsl({})).toBeUndefined();
   });
 
+  it('verifies against the system trust store when asked (public CAs, e.g. Azure)', () => {
+    expect(databaseSsl({ DATABASE_SSL: 'verify-full' })).toEqual({ rejectUnauthorized: true });
+  });
+
   it('verifies the server certificate against the configured CA', () => {
     const file = join(mkdtempSync(join(tmpdir(), 'ca-')), 'db-ca.pem');
     writeFileSync(file, '-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n');

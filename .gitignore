@@ -7,4 +7,4 @@ dist/
 *.log
 .DS_Store
 coverage/
-ops/deploy/db-ca.pem
+ops/deploy/certs/*.pem

@@ -1,17 +1,19 @@
-# Production stack on one VM (OVHcloud Public Cloud, France). The database is OVHcloud's
-# managed PostgreSQL 17 on the private network, reachable only from this VM. Usage (on the VM, in this folder):
-#   docker compose --env-file .env pull && docker compose --env-file .env up -d
+# Production stack on one small VM: Azure France Central during the beta (1 GB RAM), then
+# Scaleway Paris (docs/deploy.md). The database is the provider's managed PostgreSQL 17 on
+# the private network. Nothing here is provider-specific. Usage (on the VM, in this folder):
+#   docker compose pull && docker compose up -d
 # A second copy with COMPOSE_PROJECT_NAME=sebeti-staging and its own .env runs staging.
 name: ${COMPOSE_PROJECT_NAME:-sebeti}
 
 x-app: &app
   image: ghcr.io/bouhmid119/7sebeti:${IMAGE_TAG:-latest}
   env_file: .env
-  # CA of the managed database (downloaded from the OVHcloud console as ops/deploy/db-ca.pem).
   environment:
-    DATABASE_CA_CERT_FILE: /run/secrets/db-ca.pem
+    # Sized for a 1 GB VM: keep the V8 heap well under the container limit.
+    NODE_OPTIONS: --max-old-space-size=${NODE_HEAP_MB:-160}
+  # Optional CA for providers with a private one (set DATABASE_CA_CERT_FILE=/run/secrets/certs/db-ca.pem).
   volumes:
-    - ./db-ca.pem:/run/secrets/db-ca.pem:ro
+    - ./certs:/run/secrets/certs:ro
   restart: unless-stopped
   logging:
     driver: json-file
@@ -28,7 +30,7 @@ services:
     command: api
     depends_on:
       migrate: { condition: service_completed_successfully }
-    mem_limit: ${API_MEM_LIMIT:-512m}
+    mem_limit: ${API_MEM_LIMIT:-256m}
     healthcheck:
       test: ['CMD', 'node', '-e', "fetch('http://localhost:4000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
@@ -40,23 +42,26 @@ services:
     command: worker
     depends_on:
       migrate: { condition: service_completed_successfully }
-    mem_limit: ${WORKER_MEM_LIMIT:-512m}
+    mem_limit: ${WORKER_MEM_LIMIT:-256m}
 
   backup:
     build: ../backup
     env_file: .env
-    # libpq (pg_dump) verifies the managed database certificate against its CA.
+    # pg_dump verifies the database certificate: system roots by default (Azure), or a CA
+    # file from ./certs for providers with a private CA (PGSSLROOTCERT in .env).
     environment:
-      PGSSLMODE: verify-full
-      PGSSLROOTCERT: /run/secrets/db-ca.pem
+      PGSSLMODE: ${PGSSLMODE:-verify-full}
+      PGSSLROOTCERT: ${PGSSLROOTCERT:-system}
     volumes:
-      - ./db-ca.pem:/run/secrets/db-ca.pem:ro
+      - ./certs:/run/secrets/certs:ro
+    mem_limit: 128m
     restart: unless-stopped
     profiles: [backup]
 
   caddy:
     image: caddy:2
     restart: unless-stopped
+    mem_limit: 64m
     ports: ['80:80', '443:443', '443:443/udp']
     environment:
       API_DOMAIN: ${API_DOMAIN:-api.7sebeti.com}

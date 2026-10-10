@@ -1,6 +1,6 @@
 # Sécurité des données
 
-Ce document décrit ce qui est en place dans le code. Hébergement : OVHcloud en France (`docs/deploy.md`). Proxy Cloudflare désactivé devant l'API, e-mails par Resend, sauvegardes chez OVH (décisions du 8 octobre 2026, page Notion « Design d'architecture », section 1).
+Ce document décrit ce qui est en place dans le code. Hébergement : Azure France Central pendant la bêta, puis Scaleway Paris (`docs/deploy.md`). Proxy Cloudflare désactivé devant l'API, e-mails par Resend, sauvegardes chez OVH (décisions du 8 octobre 2026, page Notion « Design d'architecture », section 1).
 
 ## Authentification
 
@@ -11,8 +11,8 @@ Ce document décrit ce qui est en place dans le code. Hébergement : OVHcloud en
 
 ## Connexion à la base
 
-- Base managée OVHcloud sur le réseau privé, joignable seulement depuis l'IP privée de la VM.
-- TLS vérifié : l'API, le worker, les migrations (`DATABASE_CA_CERT_FILE`) et la sauvegarde (`PGSSLMODE=verify-full`) contrôlent le certificat de la base avec le CA téléchargé depuis la console ; un autre certificat est refusé.
+- Base managée en accès privé (réseau virtuel), joignable seulement depuis la VM.
+- TLS toujours vérifié : l'API, le worker et les migrations contrôlent le certificat de la base (`DATABASE_SSL=verify-full` avec les autorités publiques du système, ou `DATABASE_CA_CERT_FILE` pour un fournisseur à CA privée) ; la sauvegarde aussi (`PGSSLMODE=verify-full`). Un certificat qui ne correspond pas est refusé.
 
 ## Isolation entre marchands (RLS)
 

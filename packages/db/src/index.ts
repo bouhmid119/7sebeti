@@ -8,16 +8,20 @@ export { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 export { schema };
 
 /**
- * TLS settings for managed PostgreSQL. OVHcloud signs its database certificates with its own
- * CA: download it from the console and point DATABASE_CA_CERT_FILE at it, and leave sslmode
- * out of DATABASE_URL (the pg driver used by pg-boss would let the URL override this).
- * Unset (local, CI): no TLS options.
+ * TLS settings for managed PostgreSQL, verified in every mode except local/CI:
+ * - DATABASE_CA_CERT_FILE: verify against that CA (providers with a private CA);
+ * - DATABASE_SSL=verify-full: verify against the system trust store (Azure: DigiCert
+ *   Global Root G2 / Microsoft RSA Root CA 2017, both public roots);
+ * - neither: no TLS options (local Postgres, CI).
+ * Keep sslmode out of DATABASE_URL: the pg driver used by pg-boss lets the URL override this.
  */
 export function databaseSsl(
   env: NodeJS.ProcessEnv = process.env,
-): { ca: string; rejectUnauthorized: true } | undefined {
+): { ca?: string; rejectUnauthorized: true } | undefined {
   const file = env.DATABASE_CA_CERT_FILE;
-  return file ? { ca: readFileSync(file, 'utf8'), rejectUnauthorized: true } : undefined;
+  if (file) return { ca: readFileSync(file, 'utf8'), rejectUnauthorized: true };
+  if (env.DATABASE_SSL === 'verify-full') return { rejectUnauthorized: true };
+  return undefined;
 }
 
 export function createDb(url: string, options: { max?: number } = {}) {
