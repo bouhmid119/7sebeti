@@ -17,9 +17,8 @@ const Env = z
     RESEND_API_KEY: z.string().optional(),
     /** Sender on the Resend-verified domain. */
     EMAIL_FROM: z.string().default('7sebeti <no-reply@7sebeti.com>'),
-    /** Commit or tag of the running build (set by the image; Render sets RENDER_GIT_COMMIT). */
+    /** Commit of the running build (set by the image at build time). */
     APP_VERSION: z.string().optional(),
-    RENDER_GIT_COMMIT: z.string().optional(),
   })
   .refine((e) => e.NODE_ENV !== 'production' || Boolean(e.RESEND_API_KEY), {
     message: 'RESEND_API_KEY est obligatoire en production',

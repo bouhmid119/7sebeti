@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-/** Schemas shared by apps/api (validation, OpenAPI) and apps/web (typed client). */
+/** Schemas shared by apps/api (validation) and apps/web (response types). */
 
 export const HealthResponse = z.object({
   status: z.literal('ok'),
