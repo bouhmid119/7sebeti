@@ -1,5 +1,5 @@
 import { QUEUES } from '@7sebeti/contracts';
-import { createDb, rawExecutor, sql } from '@7sebeti/db';
+import { createDb, databaseSsl, rawExecutor, sql } from '@7sebeti/db';
 import { parseKeyring } from '@7sebeti/integrations';
 import { serve } from '@hono/node-server';
 import { PgBoss } from 'pg-boss';
@@ -7,12 +7,13 @@ import { createApp } from './app';
 import { loadEnv } from './env';
 import { createAuth } from './lib/auth';
 import { createDataKeyCache } from './lib/data-keys';
+import { createMailer } from './lib/mailer';
 
 const env = loadEnv();
 const { db, client } = createDb(env.DATABASE_URL);
 const dataMasterKeyring = parseKeyring(env.DATA_MASTER_KEY);
 
-const boss = new PgBoss(env.DATABASE_URL);
+const boss = new PgBoss({ connectionString: env.DATABASE_URL, ssl: databaseSsl() });
 boss.on('error', (err) => console.error('[pg-boss]', err));
 await boss.start();
 await boss.createQueue(QUEUES.inboundEvent);
@@ -25,6 +26,7 @@ const app = createApp({
     apiUrl: env.API_URL,
     appUrl: env.APP_URL,
     production: env.NODE_ENV === 'production',
+    sendEmail: createMailer({ apiKey: env.RESEND_API_KEY, from: env.EMAIL_FROM }),
   }),
   dataKeyFor: createDataKeyCache(db, dataMasterKeyring),
   dataMasterKeyring,

@@ -10,6 +10,7 @@ import fixture from '../../../packages/integrations/src/__fixtures__/converty-or
 import { createApp } from './app';
 import { createAuth } from './lib/auth';
 import { createDataKeyCache } from './lib/data-keys';
+import type { Email } from './lib/mailer';
 import { hashWebhookSecret } from './routes/webhooks';
 
 const url = process.env.DATABASE_URL;
@@ -19,6 +20,7 @@ describe.skipIf(!url)('API', () => {
   const { db, client } = createDb(url ?? '', { max: 3 });
   const dataMasterKeyring = parseKeyring(`v1:${randomBytes(32).toString('base64')}`);
   const enqueued: object[] = [];
+  const sent: Email[] = [];
   const logs: string[] = [];
   const app = createApp({
     db,
@@ -28,6 +30,9 @@ describe.skipIf(!url)('API', () => {
       apiUrl: 'http://localhost:4000',
       appUrl: APP_URL,
       production: false,
+      sendEmail: async (email) => {
+        sent.push(email);
+      },
     }),
     dataKeyFor: createDataKeyCache(db, dataMasterKeyring),
     dataMasterKeyring,
@@ -59,6 +64,7 @@ describe.skipIf(!url)('API', () => {
       .map((c) => c.split(';')[0])
       .join('; ');
     expect(cookie).toContain('session_token');
+    expect(sent.at(-1)).toMatchObject({ to: email, subject: 'Confirmez votre adresse e-mail' });
     return cookie;
   }
 
@@ -87,6 +93,19 @@ describe.skipIf(!url)('API', () => {
     const me = await app.request('/api/me', { headers: { cookie } });
     const body = (await me.json()) as { organizations: { id: string; role: string }[] };
     expect(body.organizations).toEqual([expect.objectContaining({ id: orgId, role: 'owner' })]);
+  });
+
+  it('sends a password reset link by e-mail', async () => {
+    const email = emails.at(-1) ?? '';
+    const res = await app.request('/api/auth/request-password-reset', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: APP_URL },
+      body: JSON.stringify({ email, redirectTo: `${APP_URL}/nouveau-mot-de-passe` }),
+    });
+    expect(res.status).toBe(200);
+    const mail = sent.at(-1);
+    expect(mail).toMatchObject({ to: email, subject: 'Réinitialisation de votre mot de passe' });
+    expect(mail?.text).toContain('/api/auth/reset-password/');
   });
 
   it('keeps organizations apart', async () => {

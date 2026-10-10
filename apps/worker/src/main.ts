@@ -1,5 +1,5 @@
 import { QUEUES } from '@7sebeti/contracts';
-import { createDb, eq, schema } from '@7sebeti/db';
+import { createDb, databaseSsl, eq, schema } from '@7sebeti/db';
 import { BRIEF_OUTPUT_SCHEMA, BRIEF_SYSTEM_PROMPT } from '@7sebeti/domain';
 import { createClaudeJsonWriter, parseKeyring, unwrapDataKey } from '@7sebeti/integrations';
 import { PgBoss } from 'pg-boss';
@@ -43,7 +43,7 @@ const dataKeyFor = async (organizationId: string) => {
   return key;
 };
 
-const boss = new PgBoss(env.DATABASE_URL);
+const boss = new PgBoss({ connectionString: env.DATABASE_URL, ssl: databaseSsl() });
 boss.on('error', (err) => console.error('[pg-boss]', err));
 await boss.start();
 await boss.createQueue(QUEUES.inboundEvent, { retryLimit: 5, retryBackoff: true });

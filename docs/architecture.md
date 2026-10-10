@@ -107,19 +107,17 @@ Chaque source implémente une interface commune dans `packages/integrations` :
 
 ## 8. Hébergement et coûts
 
-**Production : Scaleway, région Paris**, données dans l'UE chez un hébergeur établi dans l'UE (environ 27,6 $/mois en bêta selon la page Notion « Design d'architecture ») :
+Le moins cher pendant la bêta, puis un hébergeur européen dès les premiers marchands payants (décision d'Ahmed du 10 octobre 2026). Le design reste indépendant du fournisseur : une VM en Docker Compose, un PostgreSQL managé standard, un stockage S3, aucun service propre à un cloud.
 
-| Élément | Service |
-|---|---|
-| API, worker, Caddy (TLS), sauvegarde de nuit | Instance DEV1-S, Docker Compose (`ops/deploy/`) |
-| PostgreSQL 17 | Managed Database DB-DEV-S, réseau privé uniquement |
-| Front | Cloudflare Pages, gratuit |
-| Sauvegardes hors région | Cloudflare R2 juridiction UE, chiffrées avec une clé que R2 ne détient pas |
-| Image | GitHub Container Registry |
+| Étape | Hébergement | Coût |
+|---|---|---|
+| Bêta | Azure France Central : VM B2ats v2 (1 Go) + PostgreSQL 17 Flexible Server B1ms 32 Go en accès privé | ~6,50 $/mois pendant 12 mois (offre gratuite), ~32 $ ensuite |
+| Étape 1 | Scaleway Paris : instance + PostgreSQL managé sur réseau privé | ~28 $/mois |
+| Commun | Sauvegardes OVHcloud Object Storage (S3, verrouillage), Cloudflare Pages et DNS, Resend, GHCR | quelques centimes |
 
-Une seule image Docker sert l'API, le worker et les migrations, ce qui garde **Render Francfort** comme repli sans changer de code (`render.yaml`). Détails et procédure : `docs/deploy.md`.
+Migration d'une étape à l'autre : dump, restauration, changement de `DATABASE_URL`, bascule DNS (TTL 5 minutes). Procédure : `docs/deploy.md` ; plan : page Notion « Design d'architecture v2 », section 4.5. Render Francfort reste un repli avec la même image (`render.yaml`).
 
-**Plus tard** : passer en DEV1-M si la RAM dépasse 75 %, séparer les workers par file (`WORKER_QUEUES`), puis une base plus grande. Pas de changement de code applicatif.
+**Plus tard** : VM plus grande si la mémoire sature, séparer les workers par file (`WORKER_QUEUES`), puis une base plus grande. Pas de changement de code applicatif.
 
 ## 9. Migration depuis la v1
 
@@ -134,7 +132,7 @@ Une seule image Docker sert l'API, le worker et les migrations, ce qui garde **R
 
 1. **Approche** : nouvelle structure, métier de la v1 porté dans `packages/domain` avec tests.
 2. **Cible** : SaaS multi-marchands dès la v2.
-3. **Hébergement** : Scaleway Paris (VM DEV1-S en Docker Compose + PostgreSQL 17 managé), front sur Cloudflare Pages, DNS `7sebeti.com` chez Cloudflare, Render Francfort en repli avec la même image (décision d'Ahmed du 7 octobre 2026).
+3. **Hébergement** : Azure France Central pendant la bêta (offre gratuite), Scaleway Paris dès les premiers marchands payants, sans service propre à un cloud ; front sur Cloudflare Pages, DNS chez Cloudflare, sauvegardes chez OVHcloud, Render Francfort en repli (décision d'Ahmed du 10 octobre 2026).
 4. **ORM** : Drizzle.
 
 Ces choix restent réversibles tant que le métier n'est pas porté.

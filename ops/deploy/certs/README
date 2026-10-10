@@ -1,0 +1,1 @@
+# Put the database CA here only for providers with a private CA (not needed on Azure).
