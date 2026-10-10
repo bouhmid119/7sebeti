@@ -8,3 +8,7 @@ dist/
 .DS_Store
 coverage/
 ops/deploy/certs/*.pem
+# Never commit keys (age backup identity, SSH, certificates)
+*.key
+*.pem
+!ops/deploy/certs/README

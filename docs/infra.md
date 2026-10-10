@@ -47,11 +47,13 @@ terraform apply
 terraform output ssh                            # la commande SSH de la VM
 ```
 
-Ce que ça crée en Italy North (Milan ; France Central ne propose aucune taille B aux nouveaux abonnements, l'état Terraform reste, lui, en France Central) : le groupe `hsebeti-beta`, le réseau `hsebeti-vnet` (sous-réseaux `vm` et `db`), PostgreSQL 17 Flexible Server B1ms 32 Go en accès privé avec la base `hsebeti`, la VM B2ats v2 Ubuntu 24.04 (Docker, swap, pare-feu, mises à jour automatiques, dépôt cloné), son IP publique statique, un pare-feu réseau (SSH depuis ton IP seulement, 80 et 443), un budget avec alertes à 80 % et 100 %, et le stockage des sauvegardes : compte `hsebetibackup…` (sans clé partagée) avec le conteneur `hsebeti-backups`, immuable 7 jours, cycle de vie `daily/` 8 jours et `weekly/` 29 jours. La VM y écrit avec son identité managée ; toi, tu peux lire les dumps pour les tests de restauration. Valeurs pour `.env` : `terraform output backup_env`.
+Ce que ça crée en Denmark East : le groupe `hsebeti-beta`, le réseau `hsebeti-vnet` (sous-réseaux `vm` et `db`), PostgreSQL 17 Flexible Server B1ms 32 Go en accès privé avec la base `hsebeti`, la VM B2ats v2 Ubuntu 24.04 (Docker, swap, pare-feu, mises à jour automatiques, dépôt cloné), son IP publique statique, un pare-feu réseau (SSH depuis ton IP seulement, 80 et 443), un budget avec alertes à 80 % et 100 %, et le stockage des sauvegardes : compte `hsebetibackup…` (sans clé partagée) avec le conteneur `hsebeti-backups`, immuable 7 jours, cycle de vie `daily/` 8 jours et `weekly/` 29 jours. La VM y écrit avec son identité managée ; toi, tu peux lire les dumps pour les tests de restauration. Valeurs pour `.env` : `terraform output backup_env`.
 
 La politique d'immuabilité est créée déverrouillée (on peut encore changer sa durée). Avant les premières données réelles, la verrouiller dans le portail : ce choix est définitif.
 
-**Avant le premier `apply`** : vérifier dans le portail que l'abonnement est bien éligible à l'offre gratuite (VM B2ats v2 et base B1ms à 750 h/mois dans la région choisie) et passer le compte en paiement à l'utilisation dans les 30 jours.
+**Région et taille.** La bêta a été créée le 10 octobre 2026 en Denmark East avec une VM B1s (offre gratuite) : sur un nouvel abonnement, France Central n'ouvrait aucune taille B (quota « Standard Basv2 Family » à zéro, demande au support en cours). Les valeurs par défaut suivent ce qui existe, pour que chaque `apply` ne fasse que des ajouts ou des mises à jour. Changer `location` recrée toutes les ressources de ce dossier (pas l'état Terraform, qui reste en France Central) : à faire seulement avec une migration de la base (`docs/deploy.md`). Régions de l'UE à essayer si besoin : `francecentral` une fois le quota accordé, `italynorth`, `swedencentral`, `polandcentral`.
+
+**Avant le premier `apply`** : vérifier dans le portail que l'abonnement est bien éligible à l'offre gratuite (VM B1s et base B1ms à 750 h/mois dans la région choisie) et passer le compte en paiement à l'utilisation dans les 30 jours.
 
 ## 3. DNS
 

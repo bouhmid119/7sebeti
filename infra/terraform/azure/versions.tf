@@ -1,5 +1,6 @@
-# Beta infrastructure on Azure Italy North, Milan (decision of 10 October 2026; France Central
-# offers no B size to new subscriptions). The state storage stays in France Central.
+# Beta infrastructure on Azure Denmark East, where it was created on 10 October 2026 (B sizes
+# were not available to the subscription in France Central). Region and size are variables;
+# changing the region recreates everything in this root.
 # Shape shared with the future Scaleway root (MOH-19): one VM running Docker Compose,
 # one managed PostgreSQL 17 on a private network, same cloud-init, same outputs.
 

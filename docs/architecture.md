@@ -132,7 +132,7 @@ Le moins cher pendant la bêta, puis un hébergeur européen dès les premiers m
 
 | Étape | Hébergement | Coût |
 |---|---|---|
-| Bêta | Azure Italy North (Milan) : VM B2ats v2 (2 vCPU, 1 Go) + PostgreSQL 17 Flexible Server B1ms 32 Go en accès privé | ~6,50 $/mois pendant 12 mois (offre gratuite), ~32 $ ensuite |
+| Bêta | Azure Denmark East : VM B1s (1 vCPU, 1 Go) + PostgreSQL 17 Flexible Server B1ms 32 Go en accès privé | ~6,50 $/mois pendant 12 mois (offre gratuite), ~32 $ ensuite |
 | Étape 1 | Scaleway Paris : instance + PostgreSQL managé sur réseau privé | ~28 $/mois |
 | Commun | Cloudflare Pages et DNS, Resend, GHCR ; sauvegardes chez l'hébergeur de l'étape (Azure Blob immuable, puis S3 à verrouillage) | quelques centimes |
 
@@ -153,7 +153,7 @@ Migration d'une étape à l'autre : dump, restauration, changement de `DATABASE_
 
 1. **Approche** : nouvelle structure, métier de la v1 porté dans `packages/domain` avec tests.
 2. **Cible** : SaaS multi-marchands dès la v2.
-3. **Hébergement** : Azure Italy North (Milan) pendant la bêta (offre gratuite), Scaleway Paris dès les premiers marchands payants, sans service propre à un cloud ; front sur Cloudflare Pages, DNS chez Cloudflare, infrastructure en Terraform (décision d'Ahmed du 10 octobre 2026).
+3. **Hébergement** : Azure Denmark East (UE) pendant la bêta (offre gratuite), Scaleway Paris dès les premiers marchands payants, sans service propre à un cloud ; front sur Cloudflare Pages, DNS chez Cloudflare, infrastructure en Terraform (décision d'Ahmed du 10 octobre 2026).
 4. **ORM** : Drizzle.
 
 5. **Organisation du code** : un module par domaine dans `packages/modules`, un schéma Postgres par module.
