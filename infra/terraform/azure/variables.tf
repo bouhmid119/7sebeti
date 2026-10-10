@@ -5,7 +5,7 @@ variable "subscription_id" {
 
 variable "location" {
   type    = string
-  default = "francecentral" # needs the Standard Basv2 Family vCPU quota (support request); fallbacks: italynorth, swedencentral, polandcentral
+  default = "denmarkeast" # where the beta was created (10 October 2026); see docs/infra.md
 }
 
 variable "name" {
@@ -31,7 +31,7 @@ variable "ssh_allowed_cidrs" {
 
 variable "vm_size" {
   type        = string
-  default     = "Standard_B2ats_v2" # free tier, 2 vCPU, 1 GB
+  default     = "Standard_B1s" # free tier, 1 vCPU, 1 GB; the size the beta VM was created with
   description = "Standard_B1ms (2 GB) if memory runs out."
 }
 

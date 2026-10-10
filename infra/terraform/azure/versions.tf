@@ -1,5 +1,6 @@
-# Beta infrastructure on Azure France Central (decision of 10 October 2026). The VM needs the
-# Standard Basv2 Family vCPU quota there; another region is a one-variable change (location).
+# Beta infrastructure on Azure Denmark East, where it was created on 10 October 2026 (B sizes
+# were not available to the subscription in France Central). Region and size are variables;
+# changing the region recreates everything in this root.
 # Shape shared with the future Scaleway root (MOH-19): one VM running Docker Compose,
 # one managed PostgreSQL 17 on a private network, same cloud-init, same outputs.
 
