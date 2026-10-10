@@ -2,7 +2,7 @@
 
 Pilotage de la rentabilité pour le e-commerce en paiement à la livraison (COD) : funnel de confirmation, livraisons, P&L, trésorerie et stock, à partir de Converty, des transporteurs et de Meta Ads.
 
-Ce repo contient la v2, réécrite à partir de la v1. L'architecture est décrite dans [docs/architecture.md](docs/architecture.md), le déploiement dans [docs/deploy.md](docs/deploy.md).
+Ce repo contient la v2, réécrite à partir de la v1. L'architecture est décrite dans [docs/architecture.md](docs/architecture.md), le déploiement dans [docs/deploy.md](docs/deploy.md), l'infrastructure Terraform dans [docs/infra.md](docs/infra.md).
 
 ## Structure
 
