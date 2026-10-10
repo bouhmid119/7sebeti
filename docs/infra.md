@@ -1,0 +1,79 @@
+# Infrastructure (Terraform)
+
+Tout ce qui est payant est décrit dans `infra/terraform` et créé par Ahmed depuis son Mac. Rien n'est appliqué par la CI : elle vérifie seulement le format et la validité.
+
+```
+infra/
+  cloud-init/vm.yaml        premier démarrage de la VM, identique chez tous les fournisseurs
+  terraform/
+    bootstrap-azure/        une fois : le stockage chiffré de l'état Terraform
+    azure/                  bêta : réseau, VM, PostgreSQL 17 privé, budget
+    dns/                    enregistrement api.7sebeti.com chez Cloudflare
+    scaleway/               à venir, étape 1 (MOH-19), mêmes sorties qu'azure/
+```
+
+Chaque racine de fournisseur expose les mêmes sorties (`vm_public_ip`, `ssh`, `db_host`, `database_url`, `database_ssl`). Passer d'Azure à Scaleway, c'est appliquer `scaleway/`, migrer la base (`docs/deploy.md`), puis changer `api_ip` dans `dns/`.
+
+L'état Terraform contient le mot de passe de la base : il est stocké dans un compte de stockage Azure privé, sans clé partagée, accessible seulement avec ton `az login`, avec historique des versions. Jamais dans git (`infra/terraform/.gitignore`).
+
+## Pré-requis (une fois)
+
+```bash
+brew install terraform azure-cli
+az login                                   # ouvre le navigateur
+az account show --query id -o tsv          # identifiant d'abonnement
+curl -s https://ifconfig.me                # ton IP publique, pour l'accès SSH
+```
+
+Pour le DNS : un jeton Cloudflare limité à « Zone > DNS > Edit » sur `7sebeti.com`, exporté dans le terminal (`export CLOUDFLARE_API_TOKEN=…`), jamais écrit dans un fichier du repo.
+
+## 1. Stockage de l'état (une fois)
+
+```bash
+cd infra/terraform/bootstrap-azure
+terraform init
+terraform apply -var subscription_id=<id>
+cp ../backend.hcl.example ../backend.hcl   # puis y reporter les valeurs affichées (backend_config)
+```
+
+## 2. Bêta Azure
+
+```bash
+cd ../azure
+cp terraform.tfvars.example terraform.tfvars   # abonnement, clé SSH publique, ton IP, e-mail d'alerte
+terraform init -backend-config=../backend.hcl
+terraform plan                                  # relire : rien ne doit sortir de l'offre gratuite
+terraform apply
+terraform output ssh                            # la commande SSH de la VM
+```
+
+Ce que ça crée en France Central : le groupe `sebeti-beta`, le réseau `sebeti-vnet` (sous-réseaux `vm` et `db`), PostgreSQL 17 Flexible Server B1ms 32 Go en accès privé avec la base `sebeti`, la VM B2ats v2 Ubuntu 24.04 (Docker, swap, pare-feu, mises à jour automatiques, dépôt cloné), son IP publique statique, un pare-feu réseau (SSH depuis ton IP seulement, 80 et 443), et un budget avec alertes à 80 % et 100 %.
+
+**Avant le premier `apply`** : vérifier dans le portail que l'abonnement est bien éligible à l'offre gratuite (B2ats v2 et B1ms à 750 h/mois) et passer le compte en paiement à l'utilisation dans les 30 jours.
+
+## 3. DNS
+
+```bash
+cd ../dns
+cp terraform.tfvars.example terraform.tfvars   # zone_id, et api_ip = terraform -chdir=../azure output -raw vm_public_ip
+terraform init -backend-config=../backend.hcl
+terraform apply
+```
+
+## 4. Remplir `.env` sur la VM
+
+Les secrets ne passent jamais par Terraform vers la VM : tu les colles toi-même.
+
+```bash
+terraform -chdir=../azure output -raw database_url   # → DATABASE_URL, puis gestionnaire de mots de passe
+ssh sebeti@<IP>
+cd ~/7sebeti/ops/deploy && cp .env.example .env && chmod 600 .env && nano .env
+```
+
+`DATABASE_SSL=verify-full`. La suite (premier déploiement) est dans `docs/deploy.md`.
+
+## Changer ou détruire
+
+- Plus de mémoire : `vm_size = "Standard_B1ms"` dans `terraform.tfvars`, `terraform apply` (redémarre la VM, hors offre gratuite).
+- Tout supprimer à la fin de la bêta, **après** migration et vérification : `terraform destroy` dans `azure/`. La base est détruite avec : faire un dump d'abord.
+- Le fichier `.terraform.lock.hcl` créé par le premier `init` est à committer (versions des providers figées).

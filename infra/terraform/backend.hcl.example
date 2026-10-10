@@ -1,0 +1,4 @@
+# Copy to backend.hcl (git-ignored) with the values printed by bootstrap-azure.
+resource_group_name  = "sebeti-tfstate"
+storage_account_name = "sebetitfstatexxxxxx"
+container_name       = "tfstate"
