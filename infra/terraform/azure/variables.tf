@@ -5,7 +5,7 @@ variable "subscription_id" {
 
 variable "location" {
   type    = string
-  default = "italynorth" # B sizes are not offered to new subscriptions in France Central
+  default = "francecentral" # needs the Standard Basv2 Family vCPU quota (support request); fallbacks: italynorth, swedencentral, polandcentral
 }
 
 variable "name" {

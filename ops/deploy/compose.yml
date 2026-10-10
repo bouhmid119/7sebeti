@@ -1,4 +1,4 @@
-# Production stack on one small VM: Azure Italy North during the beta (1 GB RAM), then
+# Production stack on one small VM: Azure France Central during the beta (1 GB RAM), then
 # Scaleway Paris (docs/deploy.md). The database is the provider's managed PostgreSQL 17 on
 # the private network. Nothing here is provider-specific. Usage (on the VM, in this folder):
 #   docker compose pull && docker compose up -d

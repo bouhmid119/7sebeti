@@ -1,5 +1,5 @@
-# Beta infrastructure on Azure Italy North, Milan (decision of 10 October 2026; France Central
-# offers no B size to new subscriptions). The state storage stays in France Central.
+# Beta infrastructure on Azure France Central (decision of 10 October 2026). The VM needs the
+# Standard Basv2 Family vCPU quota there; another region is a one-variable change (location).
 # Shape shared with the future Scaleway root (MOH-19): one VM running Docker Compose,
 # one managed PostgreSQL 17 on a private network, same cloud-init, same outputs.
 

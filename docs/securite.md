@@ -1,6 +1,6 @@
 # Sécurité des données
 
-Ce document décrit ce qui est en place dans le code. Hébergement : Azure Italy North (Milan, UE) pendant la bêta, puis Scaleway Paris (`docs/deploy.md`). Proxy Cloudflare désactivé devant l'API, e-mails par Resend, sauvegardes chez l'hébergeur de l'étape (décisions des 8 et 10 octobre 2026, page Notion « Design d'architecture », section 1).
+Ce document décrit ce qui est en place dans le code. Hébergement : Azure France Central pendant la bêta, puis Scaleway Paris (`docs/deploy.md`). Proxy Cloudflare désactivé devant l'API, e-mails par Resend, sauvegardes chez l'hébergeur de l'étape (décisions des 8 et 10 octobre 2026, page Notion « Design d'architecture », section 1).
 
 ## Authentification
 

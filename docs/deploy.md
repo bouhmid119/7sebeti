@@ -4,7 +4,7 @@ Le principe : une VM qui fait tourner l'image Docker avec Docker Compose (`ops/d
 
 | Étape | Hébergement | Pourquoi |
 |---|---|---|
-| **Bêta** (sans marchand payant) | **Azure Italy North (Milan)**, sauvegardes comprises : VM B2ats v2 (2 vCPU, 1 Go ; France Central ne propose aucune taille B aux nouveaux abonnements), PostgreSQL 17 Flexible Server Burstable B1ms 32 Go en accès privé, créés par Terraform (`docs/infra.md`) | le moins cher : offre gratuite 12 mois, environ 6,50 $/mois de disque et d'IP (décision d'Ahmed du 10 octobre 2026) |
+| **Bêta** (sans marchand payant) | **Azure France Central**, sauvegardes comprises : VM B2ats v2 (2 vCPU, 1 Go ; demande le quota Standard Basv2 Family, voir `docs/infra.md`), PostgreSQL 17 Flexible Server Burstable B1ms 32 Go en accès privé, créés par Terraform (`docs/infra.md`) | le moins cher : offre gratuite 12 mois, environ 6,50 $/mois de disque et d'IP (décision d'Ahmed du 10 octobre 2026) |
 | **Étape 1** (premiers marchands payants) | **Scaleway Paris** : instance et PostgreSQL managé sur réseau privé | hébergeur européen, conformité (ticket MOH-19, conformité complète MOH-20) |
 
 Les sauvegardes suivent l'hébergeur : Azure Blob Storage pendant la bêta (même région, immuables 7 jours, écrites par l'identité managée de la VM, sans clé dans `.env`), un stockage S3 à verrouillage d'objets à l'étape 1 (`BACKUP_TARGET=s3`). Dans les deux cas, les dumps sont chiffrés avec `age` avant l'envoi : le fournisseur ne voit jamais que du chiffré.
