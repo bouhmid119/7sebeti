@@ -132,7 +132,7 @@ Le moins cher pendant la bêta, puis un hébergeur européen dès les premiers m
 
 | Étape | Hébergement | Coût |
 |---|---|---|
-| Bêta | Azure France Central : VM B2ats v2 (1 Go) + PostgreSQL 17 Flexible Server B1ms 32 Go en accès privé | ~6,50 $/mois pendant 12 mois (offre gratuite), ~32 $ ensuite |
+| Bêta | Azure France Central : VM B1s (1 vCPU, 1 Go) + PostgreSQL 17 Flexible Server B1ms 32 Go en accès privé | ~6,50 $/mois pendant 12 mois (offre gratuite), ~32 $ ensuite |
 | Étape 1 | Scaleway Paris : instance + PostgreSQL managé sur réseau privé | ~28 $/mois |
 | Commun | Sauvegardes OVHcloud Object Storage (S3, verrouillage), Cloudflare Pages et DNS, Resend, GHCR | quelques centimes |
 

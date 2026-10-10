@@ -31,7 +31,7 @@ variable "ssh_allowed_cidrs" {
 
 variable "vm_size" {
   type        = string
-  default     = "Standard_B2ats_v2" # free tier, 2 vCPU, 1 GB
+  default     = "Standard_B1s" # free tier, 1 vCPU, 1 GB; Basv2 quota is 0 on new subscriptions
   description = "Standard_B1ms (2 GB) if memory runs out."
 }
 
