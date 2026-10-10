@@ -6,6 +6,11 @@ resource "azurerm_linux_virtual_machine" "main" {
   admin_username        = var.admin_user
   network_interface_ids = [azurerm_network_interface.vm.id]
 
+  # Used by the nightly backup to write to Blob Storage (backup.tf), no secret needed.
+  identity {
+    type = "SystemAssigned"
+  }
+
   disable_password_authentication = true
   admin_ssh_key {
     username   = var.admin_user

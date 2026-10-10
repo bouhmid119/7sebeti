@@ -1,18 +1,19 @@
 # Déploiement
 
-Le principe : une VM qui fait tourner l'image Docker avec Docker Compose (`ops/deploy/`), une base PostgreSQL 17 managée sur un réseau privé, et des sauvegardes chiffrées dans un stockage S3. Rien dans le code ni dans le compose ne dépend d'un fournisseur : changer d'hébergeur, c'est recréer une VM et une base, restaurer un dump et basculer le DNS.
+Le principe : une VM qui fait tourner l'image Docker avec Docker Compose (`ops/deploy/`), une base PostgreSQL 17 managée sur un réseau privé, et des sauvegardes chiffrées dans un stockage objet (Azure Blob pendant la bêta, S3 ensuite). Rien dans le code ni dans le compose ne dépend d'un fournisseur : changer d'hébergeur, c'est recréer une VM et une base, restaurer un dump et basculer le DNS.
 
 | Étape | Hébergement | Pourquoi |
 |---|---|---|
-| **Bêta** (sans marchand payant) | **Azure Italy North (Milan)** : VM B2ats v2 (2 vCPU, 1 Go ; France Central ne propose aucune taille B aux nouveaux abonnements), PostgreSQL 17 Flexible Server Burstable B1ms 32 Go en accès privé, créés par Terraform (`docs/infra.md`) | le moins cher : offre gratuite 12 mois, environ 6,50 $/mois de disque et d'IP (décision d'Ahmed du 10 octobre 2026) |
+| **Bêta** (sans marchand payant) | **Azure Italy North (Milan)**, sauvegardes comprises : VM B2ats v2 (2 vCPU, 1 Go ; France Central ne propose aucune taille B aux nouveaux abonnements), PostgreSQL 17 Flexible Server Burstable B1ms 32 Go en accès privé, créés par Terraform (`docs/infra.md`) | le moins cher : offre gratuite 12 mois, environ 6,50 $/mois de disque et d'IP (décision d'Ahmed du 10 octobre 2026) |
 | **Étape 1** (premiers marchands payants) | **Scaleway Paris** : instance et PostgreSQL managé sur réseau privé | hébergeur européen, conformité (ticket MOH-19, conformité complète MOH-20) |
+
+Les sauvegardes suivent l'hébergeur : Azure Blob Storage pendant la bêta (même région, immuables 7 jours, écrites par l'identité managée de la VM, sans clé dans `.env`), un stockage S3 à verrouillage d'objets à l'étape 1 (`BACKUP_TARGET=s3`). Dans les deux cas, les dumps sont chiffrés avec `age` avant l'envoi : le fournisseur ne voit jamais que du chiffré.
 
 Communs à toutes les étapes, ils ne bougent pas aux migrations :
 
 | Élément | Service | Domaine |
 |---|---|---|
 | `apps/web` | Cloudflare Pages | `app.7sebeti.com` |
-| Sauvegardes | OVHcloud Object Storage, France (API S3, verrouillage des objets), dumps chiffrés `age` | — |
 | E-mails transactionnels | Resend, domaine en région `eu-west-1` | `7sebeti.com` |
 | Image | GitHub Container Registry, `ghcr.io/bouhmid119/7sebeti` | — |
 | DNS | Cloudflare, `api` en DNS seul, TTL 5 minutes (Terraform, `infra/terraform/dns`) | `api.7sebeti.com` |
@@ -26,10 +27,9 @@ Une seule image (`Dockerfile`), trois rôles : `api`, `worker`, `migrate`. Les a
 Rien de payant n'est créé par le code ni par la CI. Le pas-à-pas avec les écrans est dans le ticket Linear MOH-5.
 
 1. **Infrastructure Azure et DNS** : Terraform, voir `docs/infra.md`. La VM arrive prête au premier démarrage (`infra/cloud-init/vm.yaml` : swap de 1 Go, Docker, pare-feu `ufw` limité à 22/80/443, mises à jour de sécurité automatiques, SSH par clé seulement, dépôt cloné dans `~/7sebeti`).
-2. **OVHcloud Object Storage** (projet Public Cloud, région Paris) : conteneur S3 `hsebeti-backups` créé **avec verrouillage des objets**, rétention par défaut 7 jours en mode conformité ; règles de cycle de vie `daily/` 8 jours, `weekly/` 29 jours ; un utilisateur S3 limité à ce conteneur.
-3. **Resend** : domaine `7sebeti.com` en région **eu-west-1** (choix définitif), enregistrements SPF, DKIM et DMARC chez Cloudflare en « DNS only », clé API limitée à l'envoi. Les e-mails ne contiennent qu'un lien : jamais de nom ni de téléphone de client.
-4. **Clé de sauvegarde** sur un poste de confiance : `age-keygen -o hsebeti-backup.key`. La clé publique (`age1…`) va dans `.env` ; le fichier privé reste hors ligne (gestionnaire de mots de passe, copie chez Dali).
-5. **Heartbeat** Better Stack (gratuit) pour la sauvegarde de nuit.
+2. **Resend** : domaine `7sebeti.com` en région **eu-west-1** (choix définitif), enregistrements SPF, DKIM et DMARC chez Cloudflare en « DNS only », clé API limitée à l'envoi. Les e-mails ne contiennent qu'un lien : jamais de nom ni de téléphone de client.
+3. **Clé de sauvegarde** sur un poste de confiance : `age-keygen -o hsebeti-backup.key`. La clé publique (`age1…`) va dans `.env` ; le fichier privé reste hors ligne (gestionnaire de mots de passe, copie chez Dali).
+4. **Heartbeat** Better Stack (gratuit) pour la sauvegarde de nuit.
 
 ## Remplir `.env` sur la VM
 
@@ -45,7 +45,7 @@ cd ~/7sebeti/ops/deploy && cp .env.example .env && chmod 600 .env && nano .env
 
 - **Base** : `DATABASE_URL` sans `sslmode`, et `DATABASE_SSL=verify-full`. Azure signe ses certificats avec des autorités publiques (DigiCert Global Root G2, Microsoft RSA Root CA 2017), donc aucun fichier de CA n'est nécessaire. Pour un fournisseur à CA privée (à vérifier chez Scaleway), poser le CA dans `ops/deploy/certs/db-ca.pem` et renseigner `DATABASE_CA_CERT_FILE` et `PGSSLROOTCERT`.
 - **Clés** : `BETTER_AUTH_SECRET`, `ENCRYPTION_KEY` et `DATA_MASTER_KEY` se génèrent avec `openssl rand -base64 32` (préfixer `v1:` pour les deux trousseaux). Les ranger aussi dans le gestionnaire de mots de passe : sans `DATA_MASTER_KEY`, les données chiffrées sont perdues.
-- **Sauvegardes** : `S3_ENDPOINT`, `S3_REGION`, identifiants S3, `BACKUP_AGE_RECIPIENT`, `HEARTBEAT_URL`.
+- **Sauvegardes** : `BACKUP_TARGET=azure`, `AZURE_STORAGE_ACCOUNT` et `AZURE_STORAGE_CONTAINER` (`terraform output backup_env`), `BACKUP_AGE_RECIPIENT`, `HEARTBEAT_URL`. Aucune clé de stockage : la VM s'authentifie avec son identité managée.
 - **Brief IA de nuit** : `ANTHROPIC_API_KEY`, utilisée par le worker seulement (sans elle, le brief est rédigé en phrases fixes). `AI_BRIEF_MODEL` change de modèle sans toucher au code, `AI_BRIEF_ENABLED=false` coupe l'IA. Détails : `docs/brief-ia.md`.
 
 Si le repo devient privé : `docker login ghcr.io` sur la VM avec un jeton GitHub en lecture des packages.

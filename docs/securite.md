@@ -1,6 +1,6 @@
 # Sécurité des données
 
-Ce document décrit ce qui est en place dans le code. Hébergement : Azure Italy North (Milan, UE) pendant la bêta, puis Scaleway Paris (`docs/deploy.md`). Proxy Cloudflare désactivé devant l'API, e-mails par Resend, sauvegardes chez OVH (décisions du 8 octobre 2026, page Notion « Design d'architecture », section 1).
+Ce document décrit ce qui est en place dans le code. Hébergement : Azure Italy North (Milan, UE) pendant la bêta, puis Scaleway Paris (`docs/deploy.md`). Proxy Cloudflare désactivé devant l'API, e-mails par Resend, sauvegardes chez l'hébergeur de l'étape (décisions des 8 et 10 octobre 2026, page Notion « Design d'architecture », section 1).
 
 ## Authentification
 
@@ -49,7 +49,7 @@ Ce document décrit ce qui est en place dans le code. Hébergement : Azure Italy
 
 Scripts dans `ops/backup/`. En production, le service `backup` du compose (`ops/deploy/compose.yml`) lance `backup.sh` chaque nuit à 02:30 UTC :
 
-- `backup.sh`, chaque nuit : `pg_dump` compressé, chiffré avec la clé publique `age`, envoyé dans OVH Object Storage en France, dans un bucket à verrouillage d'objets (un dump ne peut pas être supprimé ni modifié pendant sa rétention, même avec nos identifiants). Le dump du dimanche va dans `weekly/`. Règles de cycle de vie : `daily/` 8 jours, `weekly/` 29 jours.
+- `backup.sh`, chaque nuit : `pg_dump` compressé, chiffré avec la clé publique `age`, envoyé pendant la bêta dans Azure Blob Storage (même région que la base, conteneur immuable 7 jours : un dump ne peut être ni modifié ni supprimé pendant ce délai ; écriture par l'identité managée de la VM, sans clé), puis à l'étape 1 dans un stockage S3 à verrouillage d'objets. Les sauvegardes sont chez le même fournisseur que la base pendant la bêta : l'immuabilité et le chiffrement `age` (clé hors d'Azure) limitent ce risque. Verrouiller la politique d'immuabilité avant les premières données réelles. Le dump du dimanche va dans `weekly/`. Règles de cycle de vie : `daily/` 8 jours, `weekly/` 29 jours.
 - `restore-check.sh`, chaque mois : restaure le dernier dump sur une base jetable **dans la même région UE** (jamais sur un runner GitHub), puis compare les comptages avec la production (`compare-counts.sh`). Une sauvegarde jamais restaurée ne compte pas.
 - La clé privée `age` reste hors ligne, chez Ahmed et Dali.
 
