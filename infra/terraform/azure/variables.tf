@@ -5,7 +5,7 @@ variable "subscription_id" {
 
 variable "location" {
   type    = string
-  default = "francecentral"
+  default = "italynorth" # B sizes are not offered to new subscriptions in France Central
 }
 
 variable "name" {
@@ -31,7 +31,7 @@ variable "ssh_allowed_cidrs" {
 
 variable "vm_size" {
   type        = string
-  default     = "Standard_B1s" # free tier, 1 vCPU, 1 GB; Basv2 quota is 0 on new subscriptions
+  default     = "Standard_B2ats_v2" # free tier, 2 vCPU, 1 GB
   description = "Standard_B1ms (2 GB) if memory runs out."
 }
 

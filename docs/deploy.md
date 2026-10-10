@@ -4,7 +4,7 @@ Le principe : une VM qui fait tourner l'image Docker avec Docker Compose (`ops/d
 
 | Étape | Hébergement | Pourquoi |
 |---|---|---|
-| **Bêta** (sans marchand payant) | **Azure France Central** : VM B1s (1 vCPU, 1 Go ; le quota Basv2 est à zéro sur un nouvel abonnement), PostgreSQL 17 Flexible Server Burstable B1ms 32 Go en accès privé, créés par Terraform (`docs/infra.md`) | le moins cher : offre gratuite 12 mois, environ 6,50 $/mois de disque et d'IP (décision d'Ahmed du 10 octobre 2026) |
+| **Bêta** (sans marchand payant) | **Azure Italy North (Milan)** : VM B2ats v2 (2 vCPU, 1 Go ; France Central ne propose aucune taille B aux nouveaux abonnements), PostgreSQL 17 Flexible Server Burstable B1ms 32 Go en accès privé, créés par Terraform (`docs/infra.md`) | le moins cher : offre gratuite 12 mois, environ 6,50 $/mois de disque et d'IP (décision d'Ahmed du 10 octobre 2026) |
 | **Étape 1** (premiers marchands payants) | **Scaleway Paris** : instance et PostgreSQL managé sur réseau privé | hébergeur européen, conformité (ticket MOH-19, conformité complète MOH-20) |
 
 Communs à toutes les étapes, ils ne bougent pas aux migrations :
