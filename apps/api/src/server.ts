@@ -36,7 +36,7 @@ const app = createApp({
     return boss.send(queue, data, { db: { executeSql: rawExecutor(tx) } });
   },
   appUrl: env.APP_URL,
-  version: env.APP_VERSION ?? env.RENDER_GIT_COMMIT ?? 'dev',
+  version: env.APP_VERSION ?? 'dev',
 });
 
 const server = serve({ fetch: app.fetch, port: env.PORT }, (info) => {

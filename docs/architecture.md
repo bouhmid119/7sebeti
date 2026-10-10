@@ -1,6 +1,6 @@
 # Architecture v2
 
-Statut : socle démarré en octobre 2026 avec les choix de la section 10, à confirmer par Ahmed. Domaine `7sebeti.com` (Cloudflare), repo `bouhmid119/7sebeti`.
+Statut : socle en place sur `main` (octobre 2026), choix de la section 10 validés par Ahmed. Domaine `7sebeti.com` (Cloudflare), repo `bouhmid119/7sebeti`. Les décisions à jour sont dans la page Notion « Design d'architecture v2 ».
 
 ## 1. Principes
 
@@ -9,7 +9,7 @@ Statut : socle démarré en octobre 2026 avec les choix de la section 10, à con
 3. **Rien ne se perd.** Chaque événement externe (webhook Converty, réponse transporteur, insight Meta) est d'abord stocké tel quel, puis traité par une file de jobs durable, rejouable.
 4. **SaaS multi-marchands dès le départ.** La v1 l'est déjà à moitié (superadmin, onboarding, modules activables) ; la v2 le fait proprement.
 5. **Testé et déployé automatiquement.** Rien n'arrive sur `main` sans CI verte ; c'est la condition pour que Claude puisse coder et réviser sans casser la prod (demande du meeting).
-6. **Portable.** Tout tourne dans des conteneurs Docker, donc le passage de Render à AWS ou GCP plus tard est un changement d'hébergeur, pas une réécriture.
+6. **Portable.** Tout tourne dans des conteneurs Docker, sans service propre à un cloud : le passage d'Azure (bêta) à Scaleway (étape 1) est un changement d'hébergeur, pas une réécriture.
 
 ## 2. Vue d'ensemble
 
@@ -123,7 +123,7 @@ Chaque source implémente une interface commune dans `packages/integrations` :
 
 - **Tests** : Vitest pour `domain` (objectif : chaque règle portée de la v1 a ses tests, avec des cas réels), tests d'intégration API sur une base Postgres éphémère, quelques parcours Playwright (connexion, tableau de bord, funnel).
 - **Test de parité** pendant la migration : mêmes données en entrée, la v2 doit retrouver les chiffres de la v1 (funnel, P&L) au dinar près.
-- **CI GitHub Actions** : lint, typecheck, tests, build à chaque PR ; revue automatique par Claude ; déploiement auto de `main` en staging puis promotion en prod.
+- **CI GitHub Actions** : lint, typecheck, tests, build à chaque PR ; revue automatique par Claude ; publication de l'image à chaque push sur `main`, déploiement par `docker compose pull` sur la VM. Un staging reviendra à l'étape 1.
 - **Linear** pour les tickets (jalons : infra, données, intégrations, UI), Notion pour la doc, comme décidé au meeting.
 
 ## 8. Hébergement et coûts
@@ -136,14 +136,14 @@ Le moins cher pendant la bêta, puis un hébergeur européen dès les premiers m
 | Étape 1 | Scaleway Paris : instance + PostgreSQL managé sur réseau privé | ~28 $/mois |
 | Commun | Sauvegardes OVHcloud Object Storage (S3, verrouillage), Cloudflare Pages et DNS, Resend, GHCR | quelques centimes |
 
-Migration d'une étape à l'autre : dump, restauration, changement de `DATABASE_URL`, bascule DNS (TTL 5 minutes). Procédure : `docs/deploy.md` ; plan : page Notion « Design d'architecture v2 », section 4.5. Render Francfort reste un repli avec la même image (`render.yaml`).
+Migration d'une étape à l'autre : dump, restauration, changement de `DATABASE_URL`, bascule DNS (TTL 5 minutes). Procédure : `docs/deploy.md` ; plan : page Notion « Design d'architecture v2 », section 4.5.
 
 **Plus tard** : VM plus grande si la mémoire sature, séparer les workers par file (`WORKER_QUEUES`), puis une base plus grande. Pas de changement de code applicatif.
 
 ## 9. Migration depuis la v1
 
 1. **Extraire et tester le métier** : porter les fonctions pures de la v1 dans `packages/domain`, avec des tests nourris par les vraies données de la v1.
-2. **Socle v2** : monorepo, CI, auth, organisations, schéma, déploiement staging.
+2. **Socle v2** : monorepo, CI, auth, organisations, schéma, déploiement de la bêta (fait).
 3. **Ingestion** : Converty (webhooks + OAuth), Dropo, Cosmos, Meta, avec reprise de l'historique depuis la base v1 par un script d'import.
 4. **Écrans** dans l'ordre de valeur : confirmation (module le plus important selon le meeting), funnel et CPL, P&L, trésorerie, stock, clients, marketing. Avec le design d'Ahmed quand il est prêt.
 5. **Double run** : la v2 reçoit les mêmes webhooks que la v1 pendant 2 semaines, le test de parité compare les chiffres chaque jour.
@@ -153,11 +153,12 @@ Migration d'une étape à l'autre : dump, restauration, changement de `DATABASE_
 
 1. **Approche** : nouvelle structure, métier de la v1 porté dans `packages/domain` avec tests.
 2. **Cible** : SaaS multi-marchands dès la v2.
-3. **Hébergement** : Azure France Central pendant la bêta (offre gratuite), Scaleway Paris dès les premiers marchands payants, sans service propre à un cloud ; front sur Cloudflare Pages, DNS chez Cloudflare, sauvegardes chez OVHcloud, Render Francfort en repli (décision d'Ahmed du 10 octobre 2026).
+3. **Hébergement** : Azure France Central pendant la bêta (offre gratuite), Scaleway Paris dès les premiers marchands payants, sans service propre à un cloud ; front sur Cloudflare Pages, DNS chez Cloudflare, sauvegardes chez OVHcloud, infrastructure en Terraform (décision d'Ahmed du 10 octobre 2026).
 4. **ORM** : Drizzle.
 
-Ces choix restent réversibles tant que le métier n'est pas porté.
+5. **Organisation du code** : un module par domaine dans `packages/modules`, un schéma Postgres par module.
+6. **Sauvegardes** chez OVHcloud Object Storage, **e-mails** par Resend.
 
-## 11. Place réservée à l'assistant IA
+## 11. Assistant IA
 
-Le chantier IA s'appuie sur ce socle : règles de détection testées dans `packages/domain/signals`, job de nuit `ai.daily-brief` dans le worker (après l'ingestion et les agrégats), endpoint « Explique-moi » dans l'API. Rien n'est codé à ce stade.
+Signaux testés dans `packages/domain/signals`, brief de nuit dans le worker, API du brief et retours des marchands dans l'API, tables dans le module `assistant`. Détails : `docs/brief-ia.md`.

@@ -1,65 +1,54 @@
 # Déploiement
 
-Le principe : une VM qui fait tourner l'image Docker avec Docker Compose (`ops/deploy/`), une base PostgreSQL 17 managée sur le réseau privé, et des sauvegardes chiffrées dans un stockage S3. Rien dans le code ni dans le compose ne dépend d'un fournisseur : changer d'hébergeur, c'est recréer une VM et une base, restaurer un dump et basculer le DNS.
+Le principe : une VM qui fait tourner l'image Docker avec Docker Compose (`ops/deploy/`), une base PostgreSQL 17 managée sur un réseau privé, et des sauvegardes chiffrées dans un stockage S3. Rien dans le code ni dans le compose ne dépend d'un fournisseur : changer d'hébergeur, c'est recréer une VM et une base, restaurer un dump et basculer le DNS.
 
 | Étape | Hébergement | Pourquoi |
 |---|---|---|
-| **Bêta** (sans marchand payant) | **Azure France Central** : VM B2ats v2 (2 vCPU, 1 Go), PostgreSQL 17 Flexible Server Burstable B1ms 32 Go en accès privé (VNet) | le moins cher : offre gratuite 12 mois, environ 6,50 $/mois de disque et d'IP (décision d'Ahmed du 10 octobre 2026) |
+| **Bêta** (sans marchand payant) | **Azure France Central** : VM B2ats v2 (2 vCPU, 1 Go), PostgreSQL 17 Flexible Server Burstable B1ms 32 Go en accès privé, créés par Terraform (`docs/infra.md`) | le moins cher : offre gratuite 12 mois, environ 6,50 $/mois de disque et d'IP (décision d'Ahmed du 10 octobre 2026) |
 | **Étape 1** (premiers marchands payants) | **Scaleway Paris** : instance et PostgreSQL managé sur réseau privé | hébergeur européen, conformité (ticket MOH-19, conformité complète MOH-20) |
-| Repli | Render Francfort, même image (`render.yaml`) | |
 
-Communs à toutes les étapes :
+Communs à toutes les étapes, ils ne bougent pas aux migrations :
 
 | Élément | Service | Domaine |
 |---|---|---|
 | `apps/web` | Cloudflare Pages | `app.7sebeti.com` |
-| Sauvegardes | OVHcloud Object Storage, France (API S3, verrouillage des objets), dumps chiffrés `age` ; ne bougent pas aux migrations | — |
+| Sauvegardes | OVHcloud Object Storage, France (API S3, verrouillage des objets), dumps chiffrés `age` | — |
 | E-mails transactionnels | Resend, domaine en région `eu-west-1` | `7sebeti.com` |
 | Image | GitHub Container Registry, `ghcr.io/bouhmid119/7sebeti` | — |
-| DNS | Cloudflare (`7sebeti.com`), `api` en DNS seul, TTL 5 minutes | `api.7sebeti.com` |
+| DNS | Cloudflare, `api` en DNS seul, TTL 5 minutes (Terraform, `infra/terraform/dns`) | `api.7sebeti.com` |
 
 ## L'image
 
 Une seule image (`Dockerfile`), trois rôles : `api`, `worker`, `migrate`. Les apps sont entièrement empaquetées au build, l'image ne contient ni `node_modules` ni sources. Chaque push sur `main` publie `ghcr.io/bouhmid119/7sebeti:latest` et `:<sha>` (`.github/workflows/image.yml`). La CI construit et démarre l'image à chaque PR.
 
-## Mise en place de la bêta (une fois, par Ahmed)
+## Mise en place (une fois, par Ahmed)
 
-Rien de payant n'est créé par le code. Le pas-à-pas avec les écrans est dans le ticket Linear MOH-5 ; en résumé :
+Rien de payant n'est créé par le code ni par la CI. Le pas-à-pas avec les écrans est dans le ticket Linear MOH-5.
 
-1. **Azure**, groupe de ressources `hsebeti-beta` en France Central, budget avec alerte :
-   - réseau virtuel `hsebeti-vnet` avec deux sous-réseaux (`vm`, `db`) ;
-   - PostgreSQL 17 Flexible Server `hsebeti-db`, Burstable B1ms 32 Go, **accès privé** sur le sous-réseau `db`, administrateur `hsebeti_admin` (il peut créer des rôles, la migration `0002` en a besoin), base `hsebeti` ;
-   - VM `hsebeti-vm` B2ats v2, Ubuntu 24.04 x64, clé SSH, sous-réseau `vm`, IP publique statique, entrées 22, 80 et 443 seulement.
-2. **OVHcloud Object Storage** (projet Public Cloud, région Paris) : conteneur S3 `hsebeti-backups` créé **avec verrouillage des objets**, rétention par défaut 7 jours en mode conformité ; règles de cycle de vie `daily/` 8 jours, `weekly/` 29 jours ; un utilisateur S3 limité à ce conteneur. Reporter `S3_ENDPOINT` et `S3_REGION` dans `.env`.
-3. **Resend** : domaine `7sebeti.com` en région **eu-west-1** (choix définitif), enregistrements SPF, DKIM et DMARC chez Cloudflare en « DNS only », clé API limitée à l'envoi (`RESEND_API_KEY`). Les e-mails ne contiennent qu'un lien : jamais de nom ni de téléphone de client.
+1. **Infrastructure Azure et DNS** : Terraform, voir `docs/infra.md`. La VM arrive prête au premier démarrage (`infra/cloud-init/vm.yaml` : swap de 1 Go, Docker, pare-feu `ufw` limité à 22/80/443, mises à jour de sécurité automatiques, SSH par clé seulement, dépôt cloné dans `~/7sebeti`).
+2. **OVHcloud Object Storage** (projet Public Cloud, région Paris) : conteneur S3 `hsebeti-backups` créé **avec verrouillage des objets**, rétention par défaut 7 jours en mode conformité ; règles de cycle de vie `daily/` 8 jours, `weekly/` 29 jours ; un utilisateur S3 limité à ce conteneur.
+3. **Resend** : domaine `7sebeti.com` en région **eu-west-1** (choix définitif), enregistrements SPF, DKIM et DMARC chez Cloudflare en « DNS only », clé API limitée à l'envoi. Les e-mails ne contiennent qu'un lien : jamais de nom ni de téléphone de client.
 4. **Clé de sauvegarde** sur un poste de confiance : `age-keygen -o hsebeti-backup.key`. La clé publique (`age1…`) va dans `.env` ; le fichier privé reste hors ligne (gestionnaire de mots de passe, copie chez Dali).
-5. **DNS** chez Cloudflare : `api` → enregistrement A vers l'IP de la VM, **proxy désactivé**, TTL 5 minutes.
-6. **Heartbeat** Better Stack (gratuit) pour la sauvegarde de nuit.
+5. **Heartbeat** Better Stack (gratuit) pour la sauvegarde de nuit.
 
-**Connexion à la base.** Azure impose TLS avec des certificats d'autorités publiques (DigiCert Global Root G2, Microsoft RSA Root CA 2017) : `DATABASE_SSL=verify-full` suffit, sans fichier de CA. `DATABASE_URL` a la forme `postgres://hsebeti_admin:…@hsebeti-db.postgres.database.azure.com:5432/hsebeti`, sans `sslmode`. Pour un fournisseur à CA privée, poser le CA dans `ops/deploy/certs/db-ca.pem` et renseigner `DATABASE_CA_CERT_FILE=/run/secrets/certs/db-ca.pem` et `PGSSLROOTCERT=/run/secrets/certs/db-ca.pem`.
+## Remplir `.env` sur la VM
 
-## Préparer la VM
+Les secrets ne passent ni par Terraform ni par git : Ahmed les colle lui-même.
 
 ```bash
-# 1 Go de RAM : ajouter 1 Go de swap
-sudo fallocate -l 1G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile && echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
-# Docker
-curl -fsSL https://get.docker.com | sh
-sudo usermod -aG docker $USER
-# Pare-feu : seulement SSH, HTTP et HTTPS
-sudo ufw default deny incoming && sudo ufw allow 22/tcp && sudo ufw allow 80/tcp && sudo ufw allow 443/tcp && sudo ufw --force enable
-# Mises à jour de sécurité automatiques
-sudo apt-get install -y unattended-upgrades && sudo dpkg-reconfigure -f noninteractive unattended-upgrades
-# SSH par clé uniquement
-sudo sed -i 's/^#\?PasswordAuthentication .*/PasswordAuthentication no/' /etc/ssh/sshd_config && sudo systemctl reload ssh
-# Code de déploiement (seulement ops/)
-git clone --depth 1 https://github.com/bouhmid119/7sebeti.git && cd 7sebeti/ops/deploy
-cp .env.example .env && chmod 600 .env   # puis remplir
+terraform -chdir=infra/terraform/azure output -raw database_url   # sur le Mac → DATABASE_URL
+ssh hsebeti@<IP>
+cd ~/7sebeti/ops/deploy && cp .env.example .env && chmod 600 .env && nano .env
 ```
 
-Si le repo devient privé : `docker login ghcr.io` avec un jeton GitHub en lecture des packages.
+`ops/deploy/.env.example` liste chaque variable. Points d'attention :
 
-Brief IA de nuit : renseigner `ANTHROPIC_API_KEY` dans `.env` ; seul le worker s'en sert (sans elle, le brief est rédigé en phrases fixes). `AI_BRIEF_MODEL` change de modèle sans toucher au code, `AI_BRIEF_ENABLED=false` coupe l'IA. En staging, laisser la clé vide. Détails : `docs/brief-ia.md`.
+- **Base** : `DATABASE_URL` sans `sslmode`, et `DATABASE_SSL=verify-full`. Azure signe ses certificats avec des autorités publiques (DigiCert Global Root G2, Microsoft RSA Root CA 2017), donc aucun fichier de CA n'est nécessaire. Pour un fournisseur à CA privée (à vérifier chez Scaleway), poser le CA dans `ops/deploy/certs/db-ca.pem` et renseigner `DATABASE_CA_CERT_FILE` et `PGSSLROOTCERT`.
+- **Clés** : `BETTER_AUTH_SECRET`, `ENCRYPTION_KEY` et `DATA_MASTER_KEY` se génèrent avec `openssl rand -base64 32` (préfixer `v1:` pour les deux trousseaux). Les ranger aussi dans le gestionnaire de mots de passe : sans `DATA_MASTER_KEY`, les données chiffrées sont perdues.
+- **Sauvegardes** : `S3_ENDPOINT`, `S3_REGION`, identifiants S3, `BACKUP_AGE_RECIPIENT`, `HEARTBEAT_URL`.
+- **Brief IA de nuit** : `ANTHROPIC_API_KEY`, utilisée par le worker seulement (sans elle, le brief est rédigé en phrases fixes). `AI_BRIEF_MODEL` change de modèle sans toucher au code, `AI_BRIEF_ENABLED=false` coupe l'IA. Détails : `docs/brief-ia.md`.
+
+Si le repo devient privé : `docker login ghcr.io` sur la VM avec un jeton GitHub en lecture des packages.
 
 ## Déployer, revenir en arrière
 
@@ -74,7 +63,7 @@ Les migrations tournent dans le service `migrate` avant l'API et le worker ; si 
 
 ## Mémoire (VM de 1 Go)
 
-Limites du compose : API et worker 256 Mo chacun (tas V8 limité par `NODE_HEAP_MB`, 160 par défaut), Caddy 64 Mo, sauvegarde 128 Mo, plus 1 Go de swap. Si la VM sature (`docker stats`, `free -m`), passer en B1ms (2 Go, hors offre gratuite) avant de toucher aux limites.
+Limites du compose : API et worker 256 Mo chacun (tas V8 limité par `NODE_HEAP_MB`, 160 par défaut), Caddy 64 Mo, sauvegarde 128 Mo, plus 1 Go de swap. Si la VM sature (`docker stats`, `free -m`), passer en B1ms (2 Go, hors offre gratuite) avant de toucher aux limites (`vm_size` dans Terraform).
 
 Pas de staging pendant la bêta : la VM est trop petite. Il reviendra avec l'étape 1 (second projet Compose, `COMPOSE_PROJECT_NAME=hsebeti-staging`, sa propre `.env` et sa propre base).
 
@@ -82,15 +71,13 @@ Pas de staging pendant la bêta : la VM est trop petite. Il reviendra avec l'ét
 
 Le plan détaillé est dans la page Notion « Design d'architecture v2 », section 4.5. Côté technique :
 
-1. Créer l'instance et le PostgreSQL managé Scaleway sur un réseau privé, préparer la VM comme ci-dessus ; si Scaleway fournit un CA privé, le poser dans `certs/`.
-2. Baisser le TTL DNS est déjà fait (5 minutes). Annoncer une courte coupure.
+1. Écrire `infra/terraform/scaleway/` avec les mêmes sorties qu'`azure/`, puis l'appliquer ; la VM démarre avec le même cloud-init. Si Scaleway fournit un CA privé, le poser dans `certs/`.
+2. Le TTL DNS est déjà à 5 minutes. Annoncer une courte coupure.
 3. Arrêter l'API et le worker sur Azure (`docker compose stop api worker`) : plus aucune écriture.
 4. `pg_dump` depuis Azure, `pg_restore` vers Scaleway (créer le rôle `app_rw` avant, comme `ops/backup/restore-check.sh`), puis `ops/backup/compare-counts.sh` entre les deux bases.
 5. Copier `.env` en changeant seulement `DATABASE_URL` (et le CA si besoin), `docker compose up -d` sur Scaleway.
-6. Basculer l'enregistrement `api` vers l'IP Scaleway ; Converty rejoue les webhooks reçus pendant la coupure.
-7. Garder Azure arrêté une semaine, puis supprimer le groupe de ressources.
-
-Les sauvegardes OVH, Resend, Cloudflare et l'image ne changent pas.
+6. Changer `api_ip` dans `infra/terraform/dns` et l'appliquer ; Converty rejoue les webhooks reçus pendant la coupure.
+7. Garder Azure arrêté une semaine, puis `terraform destroy` dans `infra/terraform/azure`.
 
 ## Cloudflare Pages (front)
 
@@ -98,7 +85,3 @@ Les sauvegardes OVH, Resend, Cloudflare et l'image ne changent pas.
 - Output directory : `apps/web/dist`
 - Variable : `VITE_API_URL=https://api.7sebeti.com`
 - Domaine personnalisé : `app.7sebeti.com`. Chaque PR obtient une URL de preview.
-
-## Repli sur Render
-
-`render.yaml` décrit la même pile en Docker à Francfort (`entrypoint migrate` avant chaque déploiement). Les sauvegardes OVH restent valables : restaurer le dernier dump dans la base Render (`ops/backup/restore-check.sh`), puis basculer le DNS `api`.

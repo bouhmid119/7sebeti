@@ -60,20 +60,13 @@ terraform init -backend-config=../backend.hcl
 terraform apply
 ```
 
-## 4. Remplir `.env` sur la VM
+## 4. Suite
 
-Les secrets ne passent jamais par Terraform vers la VM : tu les colles toi-même.
-
-```bash
-terraform -chdir=../azure output -raw database_url   # → DATABASE_URL, puis gestionnaire de mots de passe
-ssh hsebeti@<IP>
-cd ~/7sebeti/ops/deploy && cp .env.example .env && chmod 600 .env && nano .env
-```
-
-`DATABASE_SSL=verify-full`. La suite (premier déploiement) est dans `docs/deploy.md`.
+La VM est prête. Remplir `.env` et lancer le premier déploiement : `docs/deploy.md` (sections « Remplir `.env` sur la VM » et « Déployer »).
 
 ## Changer ou détruire
 
 - Plus de mémoire : `vm_size = "Standard_B1ms"` dans `terraform.tfvars`, `terraform apply` (redémarre la VM, hors offre gratuite).
+- Changer d'hébergeur (Scaleway, étape 1) : `docs/deploy.md`, section « Migration vers Scaleway ».
 - Tout supprimer à la fin de la bêta, **après** migration et vérification : `terraform destroy` dans `azure/`. La base est détruite avec : faire un dump d'abord.
 - Le fichier `.terraform.lock.hcl` créé par le premier `init` est à committer (versions des providers figées).
