@@ -35,22 +35,43 @@ Statut : socle démarré en octobre 2026 avec les choix de la section 10, à con
 
 ```
 apps/
-  web/          React 19 + Vite, TanStack Router + Query, Tailwind 4, shadcn/ui
-  api/          Hono (Node) + Zod + OpenAPI
+  web/          React 19 + Vite, TanStack Query, Tailwind 4
+  api/          Hono (Node) + Zod
   worker/       pg-boss, jobs et crons
 packages/
-  domain/       règles métier pures, sans I/O (portées de la v1) + tests
-  db/           schéma Drizzle ou Prisma, migrations, seed
-  integrations/ adaptateurs : converty/, carriers/{dropo,cosmos}/, ads/meta/
-  contracts/    schémas Zod partagés front/back, client API généré
-  ui/           composants partagés (refonte UI quand le design d'Ahmed arrive)
-  config/       tsconfig, eslint, vitest partagés
+  domain/       règles métier pures, sans I/O, testées (portées de la v1)
+  modules/      un dossier par module métier, chacun avec son schéma Postgres
+  db/           client Drizzle, contexte marchand (withTenant), migrations
+  integrations/ adaptateurs Converty, transporteurs, Meta ; chiffrement
+  contracts/    schémas Zod et noms de files partagés entre apps
+  config/       tsconfig partagé
 ```
+
+### Modules (décision du 8 octobre 2026)
+
+Chaque table appartient à un seul module et vit dans le schéma Postgres de ce module :
+
+| Module | Schéma | Tables |
+|---|---|---|
+| identity | `identity` | organization, user, membership, session, account, verification, two_factor |
+| connectors | `connectors` | integration_connection, inbound_event, external_object_state |
+| catalog | `catalog` | product, bundle_component, external_product_link |
+| orders | `orders` | order, order_line, order_event, status_mapping |
+| assistant | `assistant` | ai_brief, ai_brief_feedback |
+
+Les modules shipping, marketing, finance, analytics et notifications seront créés avec leurs premières tables. Le schéma `public` reste vide.
+
+Règles, vérifiées par `pnpm lint` (`packages/modules/check-boundaries.mjs`) :
+- hors d'un module, on n'importe que sa surface publique `@7sebeti/modules/<module>` (`public.ts`) ;
+- dans un module, les imports relatifs ne sortent pas du module (sauf `shared/`, colonnes communes) ;
+- seul `packages/db` importe `@7sebeti/modules/<module>/schema`, pour assembler le client et les migrations.
+
+Les cas d'usage, routes et jobs d'un module rejoindront son dossier (`app/`, `infra/`, `routes/`, `jobs/`) au fil des chantiers ; aujourd'hui ils sont encore dans `apps/api` et `apps/worker`.
 
 Choix et raisons :
 - **SPA Vite plutôt que Next.js** : tout est derrière un login, pas de SEO à faire, et un front statique coûte zéro à héberger.
-- **Hono** plutôt qu'Express : typé de bout en bout avec Zod, génère l'OpenAPI, et le client du front est généré depuis le contrat (pas de client maintenu à la main).
-- **ORM** : Prisma reste possible pour la continuité ; je penche pour **Drizzle** parce que les rapports (funnel, P&L) ont besoin de SQL précis et qu'il n'y a pas de moteur binaire à déployer. À trancher, ce n'est pas bloquant.
+- **Hono** plutôt qu'Express : typé de bout en bout avec Zod.
+- **Drizzle** : les rapports (funnel, P&L) ont besoin de SQL précis, et il n'y a pas de moteur binaire à déployer.
 
 ## 4. Modèle de données v2
 

@@ -5,7 +5,7 @@
 import { randomUUID } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createDb, RLS_EXEMPT_TABLES, schema, withTenant, withUser } from './index';
+import { createDb, MODULE_SCHEMAS, RLS_EXEMPT_TABLES, schema, withTenant, withUser } from './index';
 
 const url = process.env.DATABASE_URL;
 
@@ -35,14 +35,24 @@ describe.skipIf(!url)('row-level security', () => {
     await client.end();
   });
 
-  it('puts every public table under RLS unless explicitly exempt', async () => {
-    const rows = await db.execute<{ relname: string }>(sql`
-      select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
-      where n.nspname = 'public' and c.relkind in ('r', 'p') and not c.relrowsecurity`);
+  it('puts every module table under RLS unless explicitly exempt', async () => {
+    const rows = await db.execute<{ name: string }>(sql`
+      select n.nspname || '.' || c.relname as name from pg_class c join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname in (${sql.join(
+        MODULE_SCHEMAS.map((s) => sql`${s}`),
+        sql`, `,
+      )}) and c.relkind in ('r', 'p') and not c.relrowsecurity`);
     const unprotected = rows
-      .map((r) => r.relname)
+      .map((r) => r.name)
       .filter((t) => !(RLS_EXEMPT_TABLES as readonly string[]).includes(t));
     expect(unprotected).toEqual([]);
+  });
+
+  it('keeps public empty: every table belongs to a module schema', async () => {
+    const rows = await db.execute<{ relname: string }>(sql`
+      select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'public' and c.relkind in ('r', 'p')`);
+    expect(rows.map((r) => r.relname)).toEqual([]);
   });
 
   it('shows an organization only its own rows', async () => {

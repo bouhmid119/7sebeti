@@ -50,6 +50,13 @@
       "when": 1791379507175,
       "tag": "0006_ai_brief_feedback_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791454353042,
+      "tag": "0007_module_schemas",
+      "breakpoints": true
     }
   ]
 }

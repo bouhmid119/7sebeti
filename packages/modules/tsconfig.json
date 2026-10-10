@@ -1,0 +1,4 @@
+{
+  "extends": "@7sebeti/config/tsconfig.base.json",
+  "include": ["*/**/*.ts"]
+}

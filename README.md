@@ -13,7 +13,8 @@ apps/
   worker/        jobs pg-boss : ingestion des commandes, syncs, crons (même VM)
 packages/
   domain/        règles métier pures et testées (statuts, argent, téléphones…)
-  db/            schéma Drizzle et migrations PostgreSQL
+  modules/       un dossier par module métier (identity, connectors, catalog, orders, assistant), chacun avec son schéma Postgres
+  db/            client Drizzle, contexte marchand (RLS) et migrations PostgreSQL
   contracts/     schémas Zod et noms de files partagés entre apps
   integrations/  adaptateurs Converty, transporteurs, Meta ; chiffrement des secrets
   config/        tsconfig partagé
@@ -46,7 +47,7 @@ Pour travailler avec Cursor : [docs/cursor.md](docs/cursor.md).
 | `pnpm typecheck` | TypeScript sur tout le monorepo |
 | `pnpm test` | Vitest |
 | `pnpm build` | builds de production |
-| `pnpm db:generate` | génère une migration après modification de `packages/db/src/schema.ts` |
+| `pnpm db:generate` | génère une migration après modification d'un `packages/modules/<module>/schema.ts` |
 | `pnpm db:migrate` | applique les migrations |
 
 ## Flux d'une commande Converty
