@@ -5,7 +5,7 @@ variable "subscription_id" {
 
 variable "location" {
   type    = string
-  default = "francecentral"
+  default = "italynorth" # B sizes are not offered to new subscriptions in France Central
 }
 
 variable "name" {

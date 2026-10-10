@@ -28,3 +28,12 @@ output "database_ssl" {
   description = "DATABASE_SSL for ops/deploy/.env (Azure uses public certificate authorities)."
   value       = "verify-full"
 }
+
+output "backup_env" {
+  description = "Backup settings for ops/deploy/.env (the VM authenticates with its managed identity)."
+  value = {
+    BACKUP_TARGET           = "azure"
+    AZURE_STORAGE_ACCOUNT   = azurerm_storage_account.backup.name
+    AZURE_STORAGE_CONTAINER = azurerm_storage_container.backups.name
+  }
+}

@@ -7,7 +7,7 @@ infra/
   cloud-init/vm.yaml        premier démarrage de la VM, identique chez tous les fournisseurs
   terraform/
     bootstrap-azure/        une fois : le stockage chiffré de l'état Terraform
-    azure/                  bêta : réseau, VM, PostgreSQL 17 privé, budget
+    azure/                  bêta : réseau, VM, PostgreSQL 17 privé, sauvegardes, budget
     dns/                    enregistrement api.7sebeti.com chez Cloudflare
     scaleway/               à venir, étape 1 (MOH-19), mêmes sorties qu'azure/
 ```
@@ -47,9 +47,11 @@ terraform apply
 terraform output ssh                            # la commande SSH de la VM
 ```
 
-Ce que ça crée en France Central : le groupe `hsebeti-beta`, le réseau `hsebeti-vnet` (sous-réseaux `vm` et `db`), PostgreSQL 17 Flexible Server B1ms 32 Go en accès privé avec la base `hsebeti`, la VM B2ats v2 Ubuntu 24.04 (Docker, swap, pare-feu, mises à jour automatiques, dépôt cloné), son IP publique statique, un pare-feu réseau (SSH depuis ton IP seulement, 80 et 443), et un budget avec alertes à 80 % et 100 %.
+Ce que ça crée en Italy North (Milan ; France Central ne propose aucune taille B aux nouveaux abonnements, l'état Terraform reste, lui, en France Central) : le groupe `hsebeti-beta`, le réseau `hsebeti-vnet` (sous-réseaux `vm` et `db`), PostgreSQL 17 Flexible Server B1ms 32 Go en accès privé avec la base `hsebeti`, la VM B2ats v2 Ubuntu 24.04 (Docker, swap, pare-feu, mises à jour automatiques, dépôt cloné), son IP publique statique, un pare-feu réseau (SSH depuis ton IP seulement, 80 et 443), un budget avec alertes à 80 % et 100 %, et le stockage des sauvegardes : compte `hsebetibackup…` (sans clé partagée) avec le conteneur `hsebeti-backups`, immuable 7 jours, cycle de vie `daily/` 8 jours et `weekly/` 29 jours. La VM y écrit avec son identité managée ; toi, tu peux lire les dumps pour les tests de restauration. Valeurs pour `.env` : `terraform output backup_env`.
 
-**Avant le premier `apply`** : vérifier dans le portail que l'abonnement est bien éligible à l'offre gratuite (B2ats v2 et B1ms à 750 h/mois) et passer le compte en paiement à l'utilisation dans les 30 jours.
+La politique d'immuabilité est créée déverrouillée (on peut encore changer sa durée). Avant les premières données réelles, la verrouiller dans le portail : ce choix est définitif.
+
+**Avant le premier `apply`** : vérifier dans le portail que l'abonnement est bien éligible à l'offre gratuite (VM B2ats v2 et base B1ms à 750 h/mois dans la région choisie) et passer le compte en paiement à l'utilisation dans les 30 jours.
 
 ## 3. DNS
 
