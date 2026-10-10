@@ -1,4 +1,4 @@
-# FALLBACK only — production runs on Scaleway Paris (docs/deploy.md).
+# FALLBACK only — production runs on OVHcloud in France (docs/deploy.md).
 # Render Blueprint using the same Docker image: API + worker + Postgres in Frankfurt.
 databases:
   - name: sebeti-db

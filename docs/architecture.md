@@ -107,20 +107,22 @@ Chaque source implémente une interface commune dans `packages/integrations` :
 
 ## 8. Hébergement et coûts
 
-**Production : Scaleway, région Paris**, données dans l'UE chez un hébergeur établi dans l'UE (environ 27,6 $/mois en bêta selon la page Notion « Design d'architecture ») :
+**Production : OVHcloud Public Cloud, une seule région en France** (Paris `EU-WEST-PAR`, sinon Gravelines `GRA`), tout dans une seule console (décision d'Ahmed du 10 octobre 2026, qui remplace Scaleway). Environ 66 €/mois HT en bêta :
 
-| Élément | Service |
-|---|---|
-| API, worker, Caddy (TLS), sauvegarde de nuit | Instance DEV1-S, Docker Compose (`ops/deploy/`) |
-| PostgreSQL 17 | Managed Database DB-DEV-S, réseau privé uniquement |
-| Front | Cloudflare Pages, gratuit |
-| Sauvegardes hors région | OVH Object Storage France, verrouillage des objets, chiffrées avec une clé qu'OVH ne détient pas |
-| E-mails transactionnels | Resend (région eu-west-1), sans donnée de client |
-| Image | GitHub Container Registry |
+| Élément | Service | Prix indicatif |
+|---|---|---|
+| API, worker, Caddy (TLS), sauvegarde de nuit | Instance d2-4, Docker Compose (`ops/deploy/`) | ~11,4 € |
+| PostgreSQL 17 | Public Cloud Databases Essential DB1-4, réseau privé | ~54,5 € |
+| Sauvegardes | Object Storage S3 avec verrouillage des objets, dumps chiffrés `age` | < 0,5 € |
+| Front | Cloudflare Pages | 0 € |
+| E-mails | Resend (région eu-west-1), sans donnée de client | 0 € en bêta |
+| Image | GitHub Container Registry | 0 € |
+
+La base managée pèse l'essentiel du coût ; une base installée sur la VM ramènerait le total vers 12 €, mais demande une astreinte que personne n'assume encore. La base et les sauvegardes sont chez le même fournisseur : le verrouillage des objets et la clé `age` gardée hors d'OVH protègent les dumps.
 
 Une seule image Docker sert l'API, le worker et les migrations, ce qui garde **Render Francfort** comme repli sans changer de code (`render.yaml`). Détails et procédure : `docs/deploy.md`.
 
-**Plus tard** : passer en DEV1-M si la RAM dépasse 75 %, séparer les workers par file (`WORKER_QUEUES`), puis une base plus grande. Pas de changement de code applicatif.
+**Plus tard** : passer en b3-8 (8 Go) si la RAM dépasse 75 %, séparer les workers par file (`WORKER_QUEUES`), puis une base plus grande. Pas de changement de code applicatif.
 
 ## 9. Migration depuis la v1
 
@@ -135,7 +137,7 @@ Une seule image Docker sert l'API, le worker et les migrations, ce qui garde **R
 
 1. **Approche** : nouvelle structure, métier de la v1 porté dans `packages/domain` avec tests.
 2. **Cible** : SaaS multi-marchands dès la v2.
-3. **Hébergement** : Scaleway Paris (VM DEV1-S en Docker Compose + PostgreSQL 17 managé), front sur Cloudflare Pages, DNS `7sebeti.com` chez Cloudflare, Render Francfort en repli avec la même image (décision d'Ahmed du 7 octobre 2026).
+3. **Hébergement** : OVHcloud en France (VM d2-4 en Docker Compose, PostgreSQL 17 managé, Object Storage), front sur Cloudflare Pages, DNS `7sebeti.com` chez Cloudflare, Render Francfort en repli avec la même image (décision d'Ahmed du 10 octobre 2026, qui remplace Scaleway).
 4. **ORM** : Drizzle.
 
 Ces choix restent réversibles tant que le métier n'est pas porté.

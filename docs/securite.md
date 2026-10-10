@@ -1,6 +1,6 @@
 # Sécurité des données
 
-Ce document décrit ce qui est en place dans le code. Hébergement : Scaleway Paris (`docs/deploy.md`). Proxy Cloudflare désactivé devant l'API, e-mails par Resend, sauvegardes chez OVH (décisions du 8 octobre 2026, page Notion « Design d'architecture », section 1).
+Ce document décrit ce qui est en place dans le code. Hébergement : OVHcloud en France (`docs/deploy.md`). Proxy Cloudflare désactivé devant l'API, e-mails par Resend, sauvegardes chez OVH (décisions du 8 octobre 2026, page Notion « Design d'architecture », section 1).
 
 ## Authentification
 
@@ -8,6 +8,11 @@ Ce document décrit ce qui est en place dans le code. Hébergement : Scaleway Pa
 - Double authentification TOTP disponible (`/api/auth/two-factor/*`). La rendre obligatoire pour les propriétaires est la prochaine étape.
 - Vérification de l'adresse à l'inscription et mot de passe oublié par e-mail (Resend, `apps/api/src/lib/mailer.ts`). Resend garde ses données aux États-Unis : un e-mail ne contient que l'adresse du marchand et un lien, jamais une donnée de client. Sans `RESEND_API_KEY` (dev, CI), l'e-mail n'est pas envoyé et seul son sujet est journalisé ; la clé est obligatoire en production.
 - Routes : `/api/auth/*` (Better Auth), `GET /api/me`, `POST /api/organizations`, et toute route métier exige l'en-tête `x-organization-id` d'une organisation dont l'utilisateur est membre.
+
+## Connexion à la base
+
+- Base managée OVHcloud sur le réseau privé, joignable seulement depuis l'IP privée de la VM.
+- TLS vérifié : l'API, le worker, les migrations (`DATABASE_CA_CERT_FILE`) et la sauvegarde (`PGSSLMODE=verify-full`) contrôlent le certificat de la base avec le CA téléchargé depuis la console ; un autre certificat est refusé.
 
 ## Isolation entre marchands (RLS)
 

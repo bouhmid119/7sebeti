@@ -9,8 +9,8 @@ Ce repo contient la v2, réécrite à partir de la v1. L'architecture est décri
 ```
 apps/
   web/           SPA React 19 + Vite + Tailwind 4 (app.7sebeti.com, Cloudflare Pages)
-  api/           API HTTP Hono : santé, webhooks, API du front (api.7sebeti.com, Scaleway Paris)
-  worker/        jobs pg-boss : ingestion des commandes, syncs, crons (Scaleway Paris)
+  api/           API HTTP Hono : santé, webhooks, API du front (api.7sebeti.com, OVHcloud France)
+  worker/        jobs pg-boss : ingestion des commandes, syncs, crons (OVHcloud France)
 packages/
   domain/        règles métier pures et testées (statuts, argent, téléphones…)
   db/            schéma Drizzle et migrations PostgreSQL

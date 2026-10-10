@@ -1,5 +1,5 @@
 import { QUEUES } from '@7sebeti/contracts';
-import { createDb, rawExecutor, sql } from '@7sebeti/db';
+import { createDb, databaseSsl, rawExecutor, sql } from '@7sebeti/db';
 import { parseKeyring } from '@7sebeti/integrations';
 import { serve } from '@hono/node-server';
 import { PgBoss } from 'pg-boss';
@@ -13,7 +13,7 @@ const env = loadEnv();
 const { db, client } = createDb(env.DATABASE_URL);
 const dataMasterKeyring = parseKeyring(env.DATA_MASTER_KEY);
 
-const boss = new PgBoss(env.DATABASE_URL);
+const boss = new PgBoss({ connectionString: env.DATABASE_URL, ssl: databaseSsl() });
 boss.on('error', (err) => console.error('[pg-boss]', err));
 await boss.start();
 await boss.createQueue(QUEUES.inboundEvent);

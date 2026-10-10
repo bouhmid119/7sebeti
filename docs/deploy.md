@@ -1,13 +1,13 @@
 # Déploiement
 
-Production : **Scaleway, région Paris** (décision d'Ahmed, octobre 2026). Repli : Render Francfort avec la même image (`render.yaml`).
+Production : **OVHcloud Public Cloud, une seule région en France** (Paris `EU-WEST-PAR`, sinon Gravelines `GRA`) pour la VM, la base et les sauvegardes, dans une seule console (décision d'Ahmed du 10 octobre 2026, qui remplace Scaleway). Repli : Render Francfort avec la même image (`render.yaml`).
 
 | Élément | Hébergement | Domaine |
 |---|---|---|
 | `apps/web` | Cloudflare Pages | `app.7sebeti.com` |
-| `api`, `worker`, Caddy, sauvegarde | Scaleway Instance DEV1-S, Paris (Docker Compose, `ops/deploy/`) | `api.7sebeti.com` |
-| PostgreSQL 17 | Scaleway Managed Database DB-DEV-S, Paris, accessible depuis la VM seulement | — |
-| Sauvegardes | OVH Object Storage, France (API S3, verrouillage des objets), dumps chiffrés `age` | — |
+| `api`, `worker`, Caddy, sauvegarde | OVHcloud instance d2-4 (Docker Compose, `ops/deploy/`) | `api.7sebeti.com` |
+| PostgreSQL 17 | OVHcloud Public Cloud Databases, Essential DB1-4, réseau privé, IPs autorisées = IP privée de la VM | — |
+| Sauvegardes | OVHcloud Object Storage (API S3, verrouillage des objets), dumps chiffrés `age` | — |
 | E-mails transactionnels | Resend, domaine en région `eu-west-1` | `7sebeti.com` |
 | Image | GitHub Container Registry, `ghcr.io/bouhmid119/7sebeti` | — |
 | DNS | Cloudflare (`7sebeti.com`) | — |
@@ -20,12 +20,14 @@ Une seule image (`Dockerfile`), trois rôles : `api`, `worker`, `migrate`. Les a
 
 Rien de payant n'est créé par le code : ces étapes se font dans les consoles.
 
-1. **Scaleway**, projet `7sebeti`, région `fr-par` :
-   - Private Network `sebeti`.
-   - Managed Database PostgreSQL 17, DB-DEV-S, attachée au Private Network, sans endpoint public ; sauvegardes automatiques activées. Créer la base `sebeti` et un utilisateur dédié.
-   - Instance DEV1-S (Debian 12 ou Ubuntu 24.04), attachée au Private Network, IP publique, clé SSH.
-   - Security group de l'instance : entrée refusée par défaut, ouvrir 22 (SSH), 80 et 443.
-2. **OVH Object Storage** (Public Cloud, région en France, par exemple `eu-west-par`) : bucket `sebeti-backups` créé **avec verrouillage des objets**, rétention par défaut 7 jours en mode conformité ; règles de cycle de vie `daily/` 8 jours, `weekly/` 29 jours ; un utilisateur S3 limité à ce bucket. Reporter `S3_ENDPOINT` et `S3_REGION` dans `.env`.
+Le pas-à-pas détaillé avec les écrans OVH est dans le ticket Linear MOH-5.
+
+1. **OVHcloud Public Cloud**, projet `7sebeti`, une seule région en France pour tout :
+   - réseau privé `sebeti` (vRack, DHCP activé, sans passerelle) ;
+   - PostgreSQL 17, offre Essential DB1-4, sur le réseau privé ; créer la base `sebeti` ; l'utilisateur `avnadmin` peut créer des rôles (la migration `0002` en a besoin) ; IPs autorisées : **uniquement** l'IP privée de la VM. L'offre garde 2 jours de sauvegardes, nos dumps de nuit couvrent le reste ;
+   - instance d2-4, Ubuntu 24.04, clé SSH, réseau public et réseau privé `sebeti`.
+   - télécharger le **certificat CA** de la base (onglet Informations générales) : il ira dans `ops/deploy/db-ca.pem` sur la VM ; l'API, le worker, les migrations et la sauvegarde vérifient le certificat de la base avec lui.
+2. **OVHcloud Object Storage**, même région : conteneur `sebeti-backups` créé **avec verrouillage des objets**, rétention par défaut 7 jours en mode conformité ; règles de cycle de vie `daily/` 8 jours, `weekly/` 29 jours ; un utilisateur S3 limité à ce bucket. Reporter `S3_ENDPOINT` (`https://s3.<région>.io.cloud.ovh.net`) et `S3_REGION` dans `.env`. La base et les sauvegardes sont chez le même fournisseur : le verrouillage des objets et le chiffrement `age` (clé hors d'OVH) protègent les dumps même si le compte est compromis.
 3. **Resend** : créer le domaine `7sebeti.com` en région **eu-west-1** (choix définitif), ajouter chez Cloudflare les enregistrements SPF, DKIM et DMARC fournis, en « DNS only » ; créer une clé API limitée à l'envoi et la mettre dans `RESEND_API_KEY`. Les e-mails ne contiennent qu'un lien : jamais de nom ni de téléphone de client.
 4. **Clé de sauvegarde** sur un poste de confiance : `age-keygen -o sebeti-backup.key`. La clé publique (`age1…`) va dans `.env` ; le fichier privé reste hors ligne (gestionnaire de mots de passe, copie chez Dali).
 5. **DNS** chez Cloudflare : `api` → enregistrement A vers l'IP de la VM, **proxy désactivé** (nuage gris) tant que l'avis juridique sur le proxy n'est pas rendu.
@@ -37,6 +39,8 @@ Rien de payant n'est créé par le code : ces étapes se font dans les consoles.
 # Docker
 curl -fsSL https://get.docker.com | sh
 sudo usermod -aG docker $USER
+# Pare-feu : seulement SSH, HTTP et HTTPS
+sudo ufw default deny incoming && sudo ufw allow 22/tcp && sudo ufw allow 80/tcp && sudo ufw allow 443/tcp && sudo ufw --force enable
 # Mises à jour de sécurité automatiques
 sudo apt-get install -y unattended-upgrades && sudo dpkg-reconfigure -f noninteractive unattended-upgrades
 # SSH par clé uniquement
@@ -44,6 +48,7 @@ sudo sed -i 's/^#\?PasswordAuthentication .*/PasswordAuthentication no/' /etc/ss
 # Code de déploiement (seulement ops/)
 git clone --depth 1 https://github.com/bouhmid119/7sebeti.git && cd 7sebeti/ops/deploy
 cp .env.example .env && chmod 600 .env   # puis remplir
+# coller le certificat CA de la base dans db-ca.pem
 ```
 
 Si le repo devient privé : `docker login ghcr.io` avec un jeton GitHub en lecture des packages.

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
@@ -6,8 +7,22 @@ import * as schema from './schema';
 export { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 export { schema };
 
+/**
+ * TLS settings for managed PostgreSQL. OVHcloud signs its database certificates with its own
+ * CA: download it from the console and point DATABASE_CA_CERT_FILE at it, and leave sslmode
+ * out of DATABASE_URL (the pg driver used by pg-boss would let the URL override this).
+ * Unset (local, CI): no TLS options.
+ */
+export function databaseSsl(
+  env: NodeJS.ProcessEnv = process.env,
+): { ca: string; rejectUnauthorized: true } | undefined {
+  const file = env.DATABASE_CA_CERT_FILE;
+  return file ? { ca: readFileSync(file, 'utf8'), rejectUnauthorized: true } : undefined;
+}
+
 export function createDb(url: string, options: { max?: number } = {}) {
-  const client = postgres(url, { max: options.max ?? 10 });
+  const ssl = databaseSsl();
+  const client = postgres(url, { max: options.max ?? 10, ...(ssl ? { ssl } : {}) });
   return { db: drizzle(client, { schema, casing: 'snake_case' }), client };
 }
 

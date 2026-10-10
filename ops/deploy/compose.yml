@@ -1,5 +1,5 @@
-# Production stack on one VM (Scaleway DEV1-S, Paris). The database is Scaleway's managed
-# PostgreSQL 17, reachable only from this VM. Usage (on the VM, in this folder):
+# Production stack on one VM (OVHcloud Public Cloud, France). The database is OVHcloud's
+# managed PostgreSQL 17 on the private network, reachable only from this VM. Usage (on the VM, in this folder):
 #   docker compose --env-file .env pull && docker compose --env-file .env up -d
 # A second copy with COMPOSE_PROJECT_NAME=sebeti-staging and its own .env runs staging.
 name: ${COMPOSE_PROJECT_NAME:-sebeti}
@@ -7,6 +7,11 @@ name: ${COMPOSE_PROJECT_NAME:-sebeti}
 x-app: &app
   image: ghcr.io/bouhmid119/7sebeti:${IMAGE_TAG:-latest}
   env_file: .env
+  # CA of the managed database (downloaded from the OVHcloud console as ops/deploy/db-ca.pem).
+  environment:
+    DATABASE_CA_CERT_FILE: /run/secrets/db-ca.pem
+  volumes:
+    - ./db-ca.pem:/run/secrets/db-ca.pem:ro
   restart: unless-stopped
   logging:
     driver: json-file
@@ -40,6 +45,12 @@ services:
   backup:
     build: ../backup
     env_file: .env
+    # libpq (pg_dump) verifies the managed database certificate against its CA.
+    environment:
+      PGSSLMODE: verify-full
+      PGSSLROOTCERT: /run/secrets/db-ca.pem
+    volumes:
+      - ./db-ca.pem:/run/secrets/db-ca.pem:ro
     restart: unless-stopped
     profiles: [backup]
 
