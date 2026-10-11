@@ -12,3 +12,4 @@ ops/deploy/certs/*.pem
 *.key
 *.pem
 !ops/deploy/certs/README
+ops/deploy/.deployed-tag

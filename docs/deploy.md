@@ -20,7 +20,7 @@ Communs à toutes les étapes, ils ne bougent pas aux migrations :
 
 ## L'image
 
-Une seule image (`Dockerfile`), trois rôles : `api`, `worker`, `migrate`. Les apps sont entièrement empaquetées au build, l'image ne contient ni `node_modules` ni sources. Chaque push sur `main` publie `ghcr.io/bouhmid119/7sebeti:latest` et `:<sha>` (`.github/workflows/image.yml`). La CI construit et démarre l'image à chaque PR.
+Une seule image (`Dockerfile`), trois rôles : `api`, `worker`, `migrate`. Les apps sont entièrement empaquetées au build, l'image ne contient ni `node_modules` ni sources. Chaque push sur `main` publie `ghcr.io/bouhmid119/7sebeti:latest` et `:<sha>` (`.github/workflows/livraison.yml`). La CI construit et démarre l'image à chaque PR.
 
 ## Mise en place (une fois, par Ahmed)
 
@@ -52,11 +52,13 @@ Si le repo devient privé : `docker login ghcr.io` sur la VM avec un jeton GitHu
 
 ## Déployer, revenir en arrière
 
+Automatique : chaque fusion dans `main` construit l'image, la déploie sur la VM et vérifie `/health` ; un échec relance la version précédente. Revenir à une version : Actions > Livraison > Run workflow avec son sha. Détails et mise en place : `docs/cicd.md`.
+
+À la main, sur la VM, si GitHub Actions n'est pas disponible :
+
 ```bash
-cd ~/7sebeti/ops/deploy
-docker compose pull && docker compose up -d        # migre, puis redémarre api et worker
-IMAGE_TAG=<sha> docker compose up -d               # revenir à une version précise
-docker compose logs -f api worker
+sudo TAG=<sha> bash ~/7sebeti/ops/deploy/deploy.sh   # même script que la CI : migrations, redémarrage, santé, retour arrière
+cd ~/7sebeti/ops/deploy && docker compose logs -f api worker
 ```
 
 Les migrations tournent dans le service `migrate` avant l'API et le worker ; si elles échouent, rien ne redémarre.

@@ -1,6 +1,6 @@
 # 7sebeti v2
 
-SaaS de pilotage de la rentabilité pour le e-commerce COD (Tunisie d'abord). Architecture : `docs/architecture.md`. Sécurité : `docs/securite.md`. Déploiement : `docs/deploy.md`.
+SaaS de pilotage de la rentabilité pour le e-commerce COD (Tunisie d'abord). Architecture : `docs/architecture.md`. Sécurité : `docs/securite.md`. Déploiement : `docs/deploy.md`. CI/CD : `docs/cicd.md` (toute fusion dans `main` part en production).
 
 ## Commandes
 
