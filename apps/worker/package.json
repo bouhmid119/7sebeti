@@ -7,7 +7,8 @@
     "build": "tsup",
     "start": "node dist/main.js",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "eval-brief": "tsx --env-file-if-exists=../../.env src/brief-bench/eval-brief.ts"
   },
   "devDependencies": {
     "@7sebeti/config": "workspace:*"
