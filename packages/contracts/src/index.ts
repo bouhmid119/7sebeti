@@ -39,7 +39,7 @@ const BriefFigure = z.union([
   z.string(),
   z.null(),
   z.array(z.string().nullable()).readonly(),
-  z.record(z.string()),
+  z.record(z.string(), z.string()),
 ]);
 
 /** Une action du brief : texte de Claude ou phrases fixes, lien vers l'écran où agir. */
@@ -60,8 +60,8 @@ export const BriefSignalView = z.object({
   signal: z.string(),
   code: z.string(),
   titre: z.string(),
-  sujet: z.record(z.string()),
-  chiffres: z.record(BriefFigure),
+  sujet: z.record(z.string(), z.string()),
+  chiffres: z.record(z.string(), BriefFigure),
   seuil: z.string(),
   enJeu: z.string().nullable(),
   lien: z.string(),
