@@ -18,7 +18,7 @@
     "better-auth": "^1.7.7",
     "hono": "^4.13.13",
     "pg-boss": "^12.36.0",
-    "zod": "^3.25.76"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@7sebeti/config": "workspace:*"
