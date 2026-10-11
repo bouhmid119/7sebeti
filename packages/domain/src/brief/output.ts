@@ -82,13 +82,21 @@ export function unknownNumbers(text: string, payload: BriefPayload): string[] {
   return unknown;
 }
 
-const PSEUDONYM = /\bAgent ([A-Z]+)\b/g;
+/**
+ * « Agent A », « l'Agent A », « l'agent A » ou « agent A ».
+ * L'article fait partie du motif : sinon « l'Agent A » devient « l'Salma ».
+ */
+const PSEUDONYM = /(?:\b[LlDd]['’])?\b[Aa]gent ([A-Z]+)\b/g;
 
 function restoreNames(text: string, pseudonyms: Record<string, string>, unknown: Set<string>): string {
-  return text.replace(PSEUDONYM, (match) => {
-    const name = pseudonyms[match];
-    if (name === undefined) unknown.add(match);
-    return name ?? match;
+  return text.replace(PSEUDONYM, (match, letters: string) => {
+    const key = `Agent ${letters}`;
+    const name = pseudonyms[key];
+    if (name === undefined) {
+      unknown.add(key);
+      return match;
+    }
+    return name;
   });
 }
 

@@ -41,7 +41,19 @@ La table est sous RLS comme les autres tables métier (migration `0004_ai_brief_
 
 - `ANTHROPIC_API_KEY` : sans elle, les briefs restent en `signals_only`.
 - `AI_BRIEF_ENABLED=false` : coupe l'IA sans retirer la clé.
-- `AI_BRIEF_MODEL` : `claude-opus-5-5` par défaut ; `claude-sonnet-5-5` coûte deux fois moins cher.
+- `AI_BRIEF_MODEL` : `claude-opus-5-5` par défaut ; `claude-sonnet-5-5` coûte deux fois moins cher. Le test de qualité de MOH-11 vise `claude-haiku-5-5`.
+
+## Comparer Haiku aux phrases fixes (MOH-11)
+
+Quarante boutiques fictives, calculées par `computeSignals` comme en production, puis rédigées deux fois : phrases fixes, puis Haiku 5.5 en batch. Aucune donnée réelle. Le rapport s’affiche dans le terminal, pas dans le repo.
+
+```bash
+set -a; . ./.env; set +a
+pnpm --filter @7sebeti/worker eval-brief          # 40 cas, claude-haiku-5-5
+EVAL_BRIEF_COUNT=10 pnpm --filter @7sebeti/worker eval-brief
+```
+
+`ANTHROPIC_API_KEY` est obligatoire. `AI_BRIEF_MODEL` change le modèle. `EVAL_BRIEF_DIRECT=1` appelle le modèle un par un (plus cher, utile si le batch tarde). Relis le tableau : un avertissement « chiffre absent des données » ou un brief refusé pèse contre Haiku.
 
 Les tokens de chaque réponse gardée sont stockés (`input_tokens`, `output_tokens`, `cache_read_tokens`, `cache_write_tokens`) pour mesurer le coût réel par commerçant.
 

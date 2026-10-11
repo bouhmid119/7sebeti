@@ -197,6 +197,31 @@ describe('finalizeBrief', () => {
     });
   });
 
+  it("retire l'article collé au pseudonyme, même en minuscules", () => {
+    const result = finalizeBrief(
+      {
+        resume: "Le taux de retour de l'Agent B et de l'agent A.",
+        actions: [
+          {
+            signal: 's3',
+            titre: 'agent A sous ses objectifs',
+            constat: 'Les retours de l’Agent A dépassent le seuil.',
+            action: 'Écoutez des appels de agent A.',
+          },
+        ],
+      },
+      prepared,
+      SIGNALS,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.warnings).toEqual([]);
+    expect(result.content.resume).toBe('Le taux de retour de Mehdi et de Yasmine.');
+    expect(result.content.actions[0]?.titre).toBe('Yasmine sous ses objectifs');
+    expect(result.content.actions[0]?.constat).toBe('Les retours de Yasmine dépassent le seuil.');
+    expect(result.content.actions[0]?.action).toBe('Écoutez des appels de Yasmine.');
+  });
+
   it('écarte les actions sur un signal inconnu ou en double, et en garde cinq au plus', () => {
     const action = (signal: string) => ({ signal, titre: 't', constat: 'c', action: 'a' });
     const result = finalizeBrief(
