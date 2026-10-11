@@ -43,6 +43,8 @@ export function createApp(deps: AppDeps) {
   const app = new Hono<AppEnv>();
   app.use('*', requestLogger(deps.log));
   app.use('/api/*', cors({ origin: deps.appUrl, credentials: true }));
+  // The waiting page on app.7sebeti.com reads /health from the browser.
+  app.use('/health', cors({ origin: deps.appUrl }));
   app.on(['GET', 'POST'], '/api/auth/*', (c) => deps.auth.handler(c.req.raw));
   app.route('/', healthRoutes(deps));
   app.route('/api', organizationRoutes(deps));
