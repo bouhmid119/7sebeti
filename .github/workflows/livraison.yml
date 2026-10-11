@@ -1,0 +1,87 @@
+name: Livraison
+
+# Every push on main: build the image (tagged with the commit sha), deploy it on the VM, check it.
+# Manual run (Actions > Livraison > Run workflow) with a sha: redeploy or roll back to that image.
+#
+# The deploy goes through Azure run-command with a GitHub OIDC identity scoped to the VM:
+# no SSH port opened to GitHub, no secret stored in GitHub. Secrets stay in .env on the VM.
+# Setup (once): docs/cicd.md. Until the AZURE_CLIENT_ID_APP variable exists, only the image is built.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Commit sha of an existing image to (re)deploy
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: livraison
+  cancel-in-progress: false
+
+env:
+  TAG: ${{ inputs.tag || github.sha }}
+
+jobs:
+  publish:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          build-args: APP_VERSION=${{ github.sha }}
+          tags: |
+            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ github.repository }}:${{ github.sha }}
+
+  deploy:
+    needs: publish
+    # Runs after publish on push, alone on a manual run; skipped until the Azure identity exists.
+    if: ${{ !failure() && !cancelled() && vars.AZURE_CLIENT_ID_APP != '' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: beta-app
+      url: https://api.7sebeti.com/health
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID_APP }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Deploy on the VM (run-command)
+        run: |
+          { printf 'export TAG=%s\n' "$TAG"; cat ops/deploy/deploy.sh; } > run.sh
+          az vm run-command invoke \
+            --resource-group "${{ vars.BETA_RESOURCE_GROUP || 'hsebeti-beta' }}" \
+            --name "${{ vars.BETA_VM_NAME || 'hsebeti-vm' }}" \
+            --command-id RunShellScript --scripts @run.sh \
+            --query 'value[0].message' -o tsv | tee deploy.log
+          grep -q "DEPLOY_OK $TAG" deploy.log
+      - name: Check the public API runs this version
+        run: |
+          for i in $(seq 1 12); do
+            body=$(curl -fsS -m 10 https://api.7sebeti.com/health || true)
+            echo "$body"
+            echo "$body" | grep -q "\"version\":\"$TAG\"" && echo "$body" | grep -q '"db":"ok"' && exit 0
+            sleep 10
+          done
+          echo "::error::api.7sebeti.com/health does not report version $TAG with db ok"
+          exit 1

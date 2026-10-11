@@ -1,6 +1,6 @@
 # Infrastructure (Terraform)
 
-Tout ce qui est payant est décrit dans `infra/terraform` et créé par Ahmed depuis son Mac. Rien n'est appliqué par la CI : elle vérifie seulement le format et la validité.
+Tout ce qui est payant est décrit dans `infra/terraform`. Une PR qui touche `infra/` affiche son `terraform plan` ; une fois fusionnée, le workflow `terraform.yml` applique Azure puis le DNS **après l'approbation d'Ahmed** (environnement `beta-infra`, voir `docs/cicd.md`). Les étapes ci-dessous restent valables pour la mise en place initiale et en secours depuis le Mac.
 
 ```
 infra/
