@@ -73,4 +73,4 @@ La VM est prête. Remplir `.env` et lancer le premier déploiement : `docs/deplo
 - Plus de mémoire : `vm_size = "Standard_B1ms"` dans `terraform.tfvars`, `terraform apply` (redémarre la VM, hors offre gratuite).
 - Changer d'hébergeur (Scaleway, étape 1) : `docs/deploy.md`, section « Migration vers Scaleway ».
 - Tout supprimer à la fin de la bêta, **après** migration et vérification : `terraform destroy` dans `azure/`. La base est détruite avec : faire un dump d'abord.
-- Le fichier `.terraform.lock.hcl` créé par le premier `init` est à committer (versions des providers figées).
+- Les fichiers `.terraform.lock.hcl` sont committés : ils figent les versions des providers (azurerm 4.81.0, random 3.9.1, cloudflare 5.27.0). Pour monter de version : `terraform init -upgrade`, puis committer le fichier mis à jour.
