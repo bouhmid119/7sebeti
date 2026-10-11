@@ -10,6 +10,18 @@ variable "github_repository" {
   default = "bouhmid119/7sebeti"
 }
 
+# GitHub now puts immutable ids in the OIDC subject: repo:<owner>@<owner id>/<repo>@<repo id>:…
+# (gh api repos/bouhmid119/7sebeti --jq ".owner.id, .id"). Renaming the repo keeps working.
+variable "github_owner_id" {
+  type    = string
+  default = "183640184"
+}
+
+variable "github_repository_id" {
+  type    = string
+  default = "1406583076"
+}
+
 variable "beta_resource_group" {
   type    = string
   default = "hsebeti-beta"
@@ -30,10 +42,13 @@ data "azurerm_virtual_machine" "beta" {
 }
 
 locals {
+  owner   = split("/", var.github_repository)[0]
+  repo    = split("/", var.github_repository)[1]
+  subject = "repo:${local.owner}@${var.github_owner_id}/${local.repo}@${var.github_repository_id}"
   github = {
-    plan  = "repo:${var.github_repository}:pull_request"
-    infra = "repo:${var.github_repository}:environment:beta-infra"
-    app   = "repo:${var.github_repository}:environment:beta-app"
+    plan  = "${local.subject}:pull_request"
+    infra = "${local.subject}:environment:beta-infra"
+    app   = "${local.subject}:environment:beta-app"
   }
 }
 

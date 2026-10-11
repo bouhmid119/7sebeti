@@ -17,6 +17,7 @@ Ticket Linear : MOH-22.
   - `github-plan` : les PR, en lecture sur le groupe `hsebeti-beta` et sur l'état Terraform ;
   - `github-infra` : l'environnement `beta-infra`, propriétaire du groupe `hsebeti-beta` et écriture de l'état ;
   - `github-app` : l'environnement `beta-app`, contributeur de la seule VM (pour `run-command`).
+- **Sujet OIDC.** GitHub signe ses jetons avec un sujet qui contient les identifiants immuables du compte et du repo : `repo:bouhmid119@183640184/7sebeti@1406583076:environment:beta-app`. Les accès fédérés de `github.tf` utilisent ce format (variables `github_owner_id` et `github_repository_id`, valeurs données par `gh api repos/bouhmid119/7sebeti --jq '.owner.id, .id'`). L'ancien format `repo:bouhmid119/7sebeti:…` est refusé par Azure (AADSTS700213).
 - **Pas de SSH ouvert à GitHub.** Le déploiement passe par Azure run-command : `ops/deploy/deploy.sh` s'exécute sur la VM.
 - **Secrets de l'application sur la VM seulement**, dans `ops/deploy/.env` ; aucun workflow ne les lit.
 - **Retour arrière automatique.** Si l'API ne passe pas son healthcheck après le déploiement, `deploy.sh` relance l'image précédente (`ops/deploy/.deployed-tag`) et le workflow échoue. Les migrations déjà appliquées restent : elles doivent toujours être compatibles avec la version précédente (ajouts, pas de suppression dans la même livraison).
