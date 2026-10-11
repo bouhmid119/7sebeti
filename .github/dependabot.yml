@@ -11,6 +11,13 @@ updates:
   - package-ecosystem: docker
     directories: [/, /ops/backup]
     schedule: { interval: weekly, day: monday }
+    ignore:
+      # Node: majors by hand, LTS lines only (22 now, 24 next); never odd releases like 23 or 25.
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
+      # pg_dump must match the managed PostgreSQL major (17): a newer dump cannot be restored on it.
+      - dependency-name: postgres
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: terraform
     directories: [/infra/terraform/azure, /infra/terraform/bootstrap-azure, /infra/terraform/dns]
     schedule: { interval: weekly, day: monday }
