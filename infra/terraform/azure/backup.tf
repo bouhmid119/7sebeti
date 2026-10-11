@@ -74,11 +74,10 @@ resource "azurerm_role_assignment" "vm_backup_writer" {
   principal_id         = azurerm_linux_virtual_machine.main.identity[0].principal_id
 }
 
-# Whoever runs Terraform (Ahmed) can list and download dumps for restore tests.
-data "azurerm_client_config" "current" {}
-
+# The person who runs restore tests, pinned so a GitHub apply does not
+# replace this grant with the workflow's own identity.
 resource "azurerm_role_assignment" "operator_backup_reader" {
   scope                = azurerm_storage_container.backups.id
   role_definition_name = "Storage Blob Data Reader"
-  principal_id         = data.azurerm_client_config.current.object_id
+  principal_id         = var.backup_reader_object_id
 }

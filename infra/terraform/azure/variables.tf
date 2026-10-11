@@ -71,3 +71,8 @@ variable "alert_emails" {
   type        = list(string)
   description = "Who receives budget alerts."
 }
+
+variable "backup_reader_object_id" {
+  type        = string
+  description = "Entra object id of the person who downloads dumps for restore tests. Not the identity that runs Terraform."
+}

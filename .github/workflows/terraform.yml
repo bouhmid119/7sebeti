@@ -47,6 +47,7 @@ jobs:
       TF_VAR_ssh_public_key: ${{ vars.TF_SSH_PUBLIC_KEY }}
       TF_VAR_ssh_allowed_cidrs: ${{ secrets.TF_SSH_ALLOWED_CIDRS }}
       TF_VAR_alert_emails: ${{ secrets.TF_ALERT_EMAILS }}
+      TF_VAR_backup_reader_object_id: ${{ secrets.TF_BACKUP_READER_OBJECT_ID }}
     steps:
       - uses: actions/checkout@v7
       - uses: hashicorp/setup-terraform@v3
@@ -74,6 +75,7 @@ jobs:
       TF_VAR_ssh_public_key: ${{ vars.TF_SSH_PUBLIC_KEY }}
       TF_VAR_ssh_allowed_cidrs: ${{ secrets.TF_SSH_ALLOWED_CIDRS }}
       TF_VAR_alert_emails: ${{ secrets.TF_ALERT_EMAILS }}
+      TF_VAR_backup_reader_object_id: ${{ secrets.TF_BACKUP_READER_OBJECT_ID }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       TF_VAR_zone_id: ${{ vars.CLOUDFLARE_ZONE_ID }}
     steps:
