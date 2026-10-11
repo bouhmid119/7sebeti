@@ -68,7 +68,13 @@ jobs:
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       - name: Deploy on the VM (run-command)
         run: |
-          { printf 'export TAG=%s\n' "$TAG"; cat ops/deploy/deploy.sh; } > run.sh
+          # Azure run-command executes this file with sh (dash), which rejects pipefail.
+          # The first line re-executes the same file under bash; TAG is set before deploy.sh.
+          {
+            echo 'if [ -z "${BASH_VERSION:-}" ]; then exec /bin/bash "$0" "$@"; fi'
+            printf 'export TAG=%s\n' "$TAG"
+            cat ops/deploy/deploy.sh
+          } > run.sh
           az vm run-command invoke \
             --resource-group "${{ vars.BETA_RESOURCE_GROUP || 'hsebeti-beta' }}" \
             --name "${{ vars.BETA_VM_NAME || 'hsebeti-vm' }}" \
