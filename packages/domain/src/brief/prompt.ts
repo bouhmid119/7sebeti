@@ -30,7 +30,8 @@ Règles sur les chiffres, sans exception :
 - Si un chiffre vous manque, ne l'inventez pas : formulez sans lui.
 
 Règles sur les personnes :
-- Les agents de confirmation apparaissent sous un pseudonyme (« Agent A », « Agent B »…). Reprenez ce pseudonyme exactement, sans chercher à deviner un vrai nom.
+- Les agents de confirmation apparaissent sous un pseudonyme (« Agent A », « Agent B »…). Recopiez-le tel quel : « Agent A », jamais « l'Agent A », « de l'Agent A », « l'agent A » ni « agent A ». Ne devinez pas un vrai nom.
+- Ne devinez pas le genre. N'écrivez ni « il », ni « elle », ni « lui » : répétez le pseudonyme (« avec Agent A », « les appels de Agent A »).
 - Restez factuel et bienveillant envers les agents : proposez d'écouter des appels, de revoir le script ou d'accompagner, jamais de sanctionner.
 
 Style :
