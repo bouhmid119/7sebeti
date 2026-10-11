@@ -48,7 +48,7 @@ jobs:
       TF_VAR_ssh_allowed_cidrs: ${{ secrets.TF_SSH_ALLOWED_CIDRS }}
       TF_VAR_alert_emails: ${{ secrets.TF_ALERT_EMAILS }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_wrapper: false
@@ -77,7 +77,7 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       TF_VAR_zone_id: ${{ vars.CLOUDFLARE_ZONE_ID }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_wrapper: false
