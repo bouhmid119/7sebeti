@@ -17,7 +17,7 @@
     "@7sebeti/db": "workspace:*",
     "@7sebeti/domain": "workspace:*",
     "@7sebeti/integrations": "workspace:*",
-    "pg-boss": "^12.36.0",
+    "pg-boss": "^12.37.0",
     "zod": "^4.6.5"
   }
 }
